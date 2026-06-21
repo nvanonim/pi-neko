@@ -9,6 +9,8 @@ This repo bundles my pi extensions so they can be installed on other machines wi
 - `minimal-textchat-footer` — replaces the default footer with a compact text footer.
   - Command: `/textchat-footer on|off|toggle`
 - `model-thinking-defaults` — automatically sets preferred thinking levels for selected models.
+- `default-caveman-mode` — injects ultra-compressed caveman instructions every turn to reduce output tokens.
+  - Command: `/caveman-default on|off|lite|full|ultra|status`
 
 ## Install on another PC
 
@@ -40,6 +42,7 @@ Then restart pi or run:
 .
 ├── package.json          # pi package manifest
 ├── extensions/           # extension entrypoints loaded by pi
+│   ├── default-caveman-mode.ts
 │   ├── minimal-textchat-footer.ts
 │   └── model-thinking-defaults.ts
 └── README.md
