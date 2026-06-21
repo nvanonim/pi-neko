@@ -9,7 +9,8 @@ This repo bundles my pi extensions so they can be installed on other machines wi
 - `minimal-textchat-footer` — replaces the default footer with a compact text footer.
   - Command: `/textchat-footer on|off|toggle`
 - `model-thinking-defaults` — automatically sets preferred thinking levels for selected models.
-- `default-caveman-mode` — injects ultra-compressed caveman instructions every turn to reduce output tokens.
+- `default-caveman-mode` — loads the installed `caveman` skill and applies it every turn, defaulting to ultra.
+  - Reads `~/.agents/skills/caveman/SKILL.md` first, then `~/.pi/agent/skills/caveman/SKILL.md`.
   - Command: `/caveman-default on|off|lite|full|ultra|status`
 
 ## Install on another PC
