@@ -39,6 +39,24 @@ Then restart pi or run:
 /reload
 ```
 
+## Recommended optional packages
+
+These are not bundled by `pi-neko` because Pi packages do not have an "optional dependency" install prompt. Bundling them would force-load third-party extensions for every install. Install them separately when you want the extra tools:
+
+```bash
+# Web/search/fetch tools and librarian skill
+pi install npm:pi-web-access
+
+# Browser automation for frontend QA, screenshots, interaction, and authenticated pages
+npm install -g agent-browser@0.29.1
+pi install npm:pi-agent-browser-native
+```
+
+After installing optional packages, restart Pi or run `/reload`.
+
+- `pi-web-access` — adds web access utilities and research skills.
+- `pi-agent-browser-native` — adds the `agent_browser` tool for real browser sessions. Requires the separate `agent-browser` CLI on `PATH`.
+
 ## Repo layout
 
 ```text
