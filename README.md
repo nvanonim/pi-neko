@@ -9,6 +9,8 @@ This repo bundles my pi extensions so they can be installed on other machines wi
 - `minimal-textchat-footer` — replaces the default footer with a compact text footer.
   - Command: `/textchat-footer on|off|toggle`
 - `model-thinking-defaults` — automatically sets preferred thinking levels for selected models.
+- `agent-todo-widget` — gives the agent a `manage_todo_list` tool and shows plan progress above the editor.
+  - Command: `/todos show|hide|toggle|clear|status`
 - `default-caveman-mode` — loads the installed `caveman` skill and applies it every turn, defaulting to ultra.
   - Reads `~/.agents/skills/caveman/SKILL.md` first, then `~/.pi/agent/skills/caveman/SKILL.md`.
   - Command: `/caveman-default on|off|lite|full|ultra|status`
@@ -43,6 +45,7 @@ Then restart pi or run:
 .
 ├── package.json          # pi package manifest
 ├── extensions/           # extension entrypoints loaded by pi
+│   ├── agent-todo-widget.ts
 │   ├── default-caveman-mode.ts
 │   ├── minimal-textchat-footer.ts
 │   └── model-thinking-defaults.ts
