@@ -8,6 +8,10 @@
  *
  * Commands:
  *   /textchat-footer on|off|toggle
+ *   /git-changes show|hide|toggle
+ *
+ * Shortcut:
+ *   alt+g or f2 toggles changed-files widget
  */
 
 import type { AssistantMessage } from "@earendil-works/pi-ai";
@@ -56,6 +60,41 @@ interface GitDirty {
   untracked: number;
 }
 
+interface GitChange {
+  status: string;
+  path: string;
+}
+
+type GitChangeKind = "staged" | "unstaged" | "untracked";
+
+function parseGitStatus(output: string): GitChange[] {
+  return output
+    .split("\n")
+    .filter((line) => line.length > 0)
+    .map((line) => ({
+      status: line.slice(0, 2),
+      path: line.slice(3),
+    }));
+}
+
+function changeKind(status: string): GitChangeKind {
+  const x = status[0] ?? " ";
+  const y = status[1] ?? " ";
+  if (x === "?" && y === "?") return "untracked";
+  if (x !== " ") return "staged";
+  if (y !== " ") return "unstaged";
+  return "unstaged";
+}
+
+function statusLabel(status: string): string {
+  const x = status[0] ?? " ";
+  const y = status[1] ?? " ";
+  if (x === "?" && y === "?") return "??";
+  if (x !== " ") return `+${x}`;
+  if (y !== " ") return `*${y}`;
+  return status.trim() || "--";
+}
+
 // ── extension ──────────────────────────────────────────────────────────────
 
 export default function (pi: ExtensionAPI) {
@@ -66,6 +105,8 @@ export default function (pi: ExtensionAPI) {
   let gitDirtyTimer: ReturnType<typeof setInterval> | null = null;
   let tuiRef: { requestRender(): void } | null = null;
   let contextWindow = 200_000;
+  let changesWidgetVisible = false;
+  let lastUi: { setWidget: (k: string, v: string[] | ((tui: { requestRender(): void }, theme: Theme) => Component) | undefined, options?: { placement?: "aboveEditor" | "belowEditor" }) => void; notify: (message: string, type: "info" | "warning" | "error") => void } | null = null;
 
   async function refreshGitDirty(): Promise<void> {
     try {
@@ -77,11 +118,11 @@ export default function (pi: ExtensionAPI) {
         tuiRef?.requestRender();
         return;
       }
-      const lines = result.stdout.split("\n").filter((l) => l.length > 0);
+      const changes = parseGitStatus(result.stdout);
       let staged = 0;
       let unstaged = 0;
       let untracked = 0;
-      for (const line of lines) {
+      for (const line of result.stdout.split("\n").filter((l) => l.length > 0)) {
         const x = line[0] ?? " ";
         const y = line[1] ?? " ";
         if (x === "?" && y === "?") {
@@ -92,6 +133,7 @@ export default function (pi: ExtensionAPI) {
         if (y !== " ") unstaged++;
       }
       gitDirty = { staged, unstaged, untracked };
+      if (changesWidgetVisible) updateChangesWidget(changes);
       tuiRef?.requestRender();
     } catch {
       gitDirty = null;
@@ -111,6 +153,78 @@ export default function (pi: ExtensionAPI) {
       gitDirtyTimer = null;
     }
     gitDirty = null;
+  }
+
+  function updateChangesWidget(changes: GitChange[]): void {
+    if (!lastUi) return;
+
+    lastUi.setWidget(
+      "git-changes",
+      (_tui, theme) => ({
+        invalidate() {},
+        render(width: number): string[] {
+          const max = 20;
+          const staged = changes.filter((c) => changeKind(c.status) === "staged").length;
+          const unstaged = changes.filter((c) => changeKind(c.status) === "unstaged").length;
+          const untracked = changes.filter((c) => changeKind(c.status) === "untracked").length;
+          const header = [
+            theme.fg("accent", "git changes"),
+            theme.fg("success", `+${staged}`),
+            theme.fg("warning", `*${unstaged}`),
+            theme.fg("muted", `?${untracked}`),
+            theme.fg("dim", "• alt+g/f2 hide"),
+          ].join(" ");
+
+          if (changes.length === 0) {
+            return [truncateToWidth(`${theme.fg("success", "✓ git clean")} ${theme.fg("dim", "• alt+g/f2 hide")}`, width)];
+          }
+
+          const lines = [truncateToWidth(header, width)];
+          for (const change of changes.slice(0, max)) {
+            const kind = changeKind(change.status);
+            const color = kind === "staged" ? "success" : kind === "unstaged" ? "warning" : "muted";
+            const icon = kind === "staged" ? "●" : kind === "unstaged" ? "○" : "?";
+            const label = statusLabel(change.status).padEnd(2);
+            const text = `${theme.fg(color, `${icon} ${label}`)} ${change.path}`;
+            lines.push(truncateToWidth(text, width));
+          }
+          if (changes.length > max) {
+            lines.push(theme.fg("dim", `… ${changes.length - max} more`));
+          }
+          return lines;
+        },
+      }),
+      { placement: "belowEditor" },
+    );
+  }
+
+  async function refreshChangesWidget(): Promise<void> {
+    if (!lastUi) return;
+    try {
+      const result = await pi.exec("git", ["status", "--porcelain"], { timeout: 3000 });
+      if (result.code !== 0) {
+        lastUi.setWidget("git-changes", ["git: not a repo"], { placement: "belowEditor" });
+        return;
+      }
+      updateChangesWidget(parseGitStatus(result.stdout));
+    } catch (error) {
+      lastUi.setWidget("git-changes", [`git: failed to read status (${String(error)})`], { placement: "belowEditor" });
+    }
+  }
+
+  function hideChangesWidget(): void {
+    changesWidgetVisible = false;
+    lastUi?.setWidget("git-changes", undefined);
+  }
+
+  async function showChangesWidget(): Promise<void> {
+    changesWidgetVisible = true;
+    await refreshChangesWidget();
+  }
+
+  async function toggleChangesWidget(): Promise<void> {
+    if (changesWidgetVisible) hideChangesWidget();
+    else await showChangesWidget();
   }
 
   // Publish reactive data via extension statuses so the footer render closure
@@ -264,15 +378,20 @@ export default function (pi: ExtensionAPI) {
     if (!enabled) return;
     if (!ctx.hasUI) return;
 
+    lastUi = ctx.ui;
     publishStatuses(ctx);
     installFooter(ctx);
     startGitDirtyPolling();
   });
 
   pi.on("session_shutdown", (_event, ctx) => {
-    if (ctx.hasUI) clearStatuses(ctx);
+    if (ctx.hasUI) {
+      clearStatuses(ctx);
+      ctx.ui.setWidget("git-changes", undefined);
+    }
     stopGitDirtyPolling();
     tuiRef = null;
+    lastUi = null;
   });
 
   pi.on("model_select", (_event, ctx) => {
@@ -300,6 +419,7 @@ export default function (pi: ExtensionAPI) {
 
       if (enabled) {
         if (ctx.hasUI) {
+          lastUi = ctx.ui;
           publishStatuses(ctx);
           installFooter(ctx);
           startGitDirtyPolling();
@@ -308,11 +428,41 @@ export default function (pi: ExtensionAPI) {
       } else {
         if (ctx.hasUI) {
           ctx.ui.setFooter(undefined);
+          ctx.ui.setWidget("git-changes", undefined);
           clearStatuses(ctx);
           stopGitDirtyPolling();
         }
         ctx.ui.notify("Minimal textchat footer disabled", "info");
       }
     },
+  });
+
+  pi.registerCommand("git-changes", {
+    description: "Show changed files widget: show|hide|toggle",
+    handler: async (args, ctx) => {
+      if (!ctx.hasUI) return;
+      lastUi = ctx.ui;
+      const sub = (args ?? "toggle").trim().toLowerCase();
+      if (sub === "show") await showChangesWidget();
+      else if (sub === "hide") hideChangesWidget();
+      else if (sub === "toggle" || sub === "") await toggleChangesWidget();
+      else ctx.ui.notify("Usage: /git-changes show|hide|toggle", "warning");
+    },
+  });
+
+  async function toggleChangesWidgetShortcut(ctx: { hasUI: boolean; ui: NonNullable<typeof lastUi> }): Promise<void> {
+    if (!ctx.hasUI) return;
+    lastUi = ctx.ui;
+    await toggleChangesWidget();
+  }
+
+  pi.registerShortcut("alt+g", {
+    description: "Toggle git changed-files widget",
+    handler: toggleChangesWidgetShortcut,
+  });
+
+  pi.registerShortcut("f2", {
+    description: "Toggle git changed-files widget",
+    handler: toggleChangesWidgetShortcut,
   });
 }

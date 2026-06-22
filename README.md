@@ -7,7 +7,10 @@ This repo bundles my pi extensions so they can be installed on other machines wi
 ## Included extensions
 
 - `minimal-textchat-footer` — replaces the default footer with a compact text footer.
+  - Dirty markers beside the branch: `+N` staged, `*N` unstaged, `?N` untracked.
   - Command: `/textchat-footer on|off|toggle`
+  - Changed files widget: `/git-changes show|hide|toggle`
+  - Shortcut: `alt+g` or `f2` toggles changed-files widget (`option+g` on macOS if terminal sends Option as Meta)
 - `model-thinking-defaults` — automatically sets preferred thinking levels for selected models.
 - `agent-todo-widget` — gives the agent a `manage_todo_list` tool and shows plan progress above the editor.
   - Command: `/todos show|hide|toggle|clear|status`
