@@ -50,6 +50,9 @@ These are not bundled by `pi-neko` because Pi packages do not have an "optional 
 # Web/search/fetch tools and librarian skill
 pi install npm:pi-web-access
 
+# Fork child Pi agents for noisy investigation/review without polluting main context
+pi install git:github.com/elpapi42/pi-fork
+
 # Browser automation for frontend QA, screenshots, interaction, and authenticated pages
 npm install -g agent-browser@0.29.1
 pi install npm:pi-agent-browser-native
@@ -58,6 +61,7 @@ pi install npm:pi-agent-browser-native
 After installing optional packages, restart Pi or run `/reload`.
 
 - `pi-web-access` — adds web access utilities and research skills.
+- `pi-fork` — delegates noisy exploration, review, debugging, and planning to child Pi agents while keeping the main session cleaner. Good for MVP or big-feature work.
 - `pi-agent-browser-native` — adds the `agent_browser` tool for real browser sessions. Requires the separate `agent-browser` CLI on `PATH`.
 
 ## Repo layout
