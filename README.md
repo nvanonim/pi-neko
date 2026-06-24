@@ -14,6 +14,8 @@ This repo bundles my pi extensions so they can be installed on other machines wi
 - `model-thinking-defaults` — automatically sets preferred thinking levels for selected models.
 - `markdown-code-preview` — renders markdown code blocks as preview-style blocks instead of visible triple-backtick fences.
   - Command: `/markdown-code-preview` checks/enables the patch.
+  - Code block headers show `copy: /copy-code <id>`; run that command to copy raw code.
+  - Preview uses a subtle blue/cyan-tinted code-line background instead of left/right border glyphs, so mouse selection does not copy `│` characters.
   - Note: patches Pi's internal Markdown renderer, so Pi upgrades may require updates.
 - `agent-todo-widget` — gives the agent a `manage_todo_list` tool and shows plan progress above the editor.
   - Command: `/todos show|hide|toggle|clear|status`
