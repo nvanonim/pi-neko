@@ -12,6 +12,9 @@ This repo bundles my pi extensions so they can be installed on other machines wi
   - Changed files widget: `/git-changes show|hide|toggle`
   - Shortcut: `alt+g` or `f2` toggles changed-files widget (`option+g` on macOS if terminal sends Option as Meta)
 - `model-thinking-defaults` — automatically sets preferred thinking levels for selected models.
+- `markdown-code-preview` — renders markdown code blocks as preview-style blocks instead of visible triple-backtick fences.
+  - Command: `/markdown-code-preview` checks/enables the patch.
+  - Note: patches Pi's internal Markdown renderer, so Pi upgrades may require updates.
 - `agent-todo-widget` — gives the agent a `manage_todo_list` tool and shows plan progress above the editor.
   - Command: `/todos show|hide|toggle|clear|status`
 - `default-caveman-mode` — loads the installed `caveman` skill and applies it every turn, defaulting to ultra.
@@ -72,6 +75,7 @@ After installing optional packages, restart Pi or run `/reload`.
 ├── extensions/           # extension entrypoints loaded by pi
 │   ├── agent-todo-widget.ts
 │   ├── default-caveman-mode.ts
+│   ├── markdown-code-preview.ts
 │   ├── minimal-textchat-footer.ts
 │   └── model-thinking-defaults.ts
 └── README.md
