@@ -28,9 +28,9 @@ This repo bundles my pi extensions so they can be installed on other machines wi
 After pushing this repo to GitHub or another git host:
 
 ```bash
-pi install git:github.com/YOUR_USER/pi-neko
+pi install git:github.com/nvanonim/pi-neko
 # or pin a branch/tag/commit
-pi install git:github.com/YOUR_USER/pi-neko@main
+pi install git:github.com/nvanonim/pi-neko@main
 ```
 
 For local testing from this checkout:
