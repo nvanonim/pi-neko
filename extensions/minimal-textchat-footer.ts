@@ -260,6 +260,7 @@ export default function (pi: ExtensionAPI) {
     sessionManager: {
       getBranch(): Array<{ type: string; message?: any }>;
     };
+    getContextUsage?: () => { tokens: number | null; contextWindow: number; percent: number | null } | undefined;
   }): void {
     ctx.ui.setFooter((tui, theme, footerData) => {
       tuiRef = tui;
@@ -330,8 +331,15 @@ export default function (pi: ExtensionAPI) {
             segs.push(theme.fg("warning", gitText));
           }
 
-          // scan branch once for both context usage and tracked cost
-          let inputTokens = 0;
+          // Use Pi's live context estimate for context usage. Do not sum
+          // assistant usage.input across turns: that double-counts repeated
+          // context and can exceed 100% even when current context is fine.
+          const usage = ctx.getContextUsage?.();
+          const usageWindow = usage?.contextWindow ?? contextWindow;
+          const pctText = usage?.percent == null ? "?" : (Math.round(usage.percent * 10) / 10).toString();
+          segs.push(theme.fg("muted", `${pctText}%/${formatK(usageWindow)}`));
+
+          // scan branch for default-on tracked cost (real usage.cost.total, not speculative)
           let totalCost = 0;
           for (const e of ctx.sessionManager.getBranch()) {
             if (
@@ -339,9 +347,6 @@ export default function (pi: ExtensionAPI) {
               e.message?.role === "assistant"
             ) {
               const m = e.message as AssistantMessage;
-              if (m.usage && typeof m.usage.input === "number" && Number.isFinite(m.usage.input)) {
-                inputTokens += m.usage.input;
-              }
               if (
                 m.usage?.cost &&
                 typeof m.usage.cost.total === "number" &&
@@ -351,9 +356,6 @@ export default function (pi: ExtensionAPI) {
               }
             }
           }
-          const pct =
-            contextWindow > 0 ? Math.round((inputTokens / contextWindow) * 1000) / 10 : 0;
-          segs.push(theme.fg("muted", `${pct}%/${formatK(contextWindow)}`));
 
           // default‑on tracked cost (real usage.cost.total, not speculative)
           segs.push(theme.fg("muted", formatCost(totalCost)));
