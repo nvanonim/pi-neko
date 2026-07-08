@@ -19,8 +19,9 @@ This repo bundles my pi extensions so they can be installed on other machines wi
   - Note: patches Pi's internal Markdown renderer, so Pi upgrades may require updates.
 - `agent-todo-widget` — gives the agent a `manage_todo_list` tool and shows plan progress above the editor.
   - Command: `/todos show|hide|toggle|clear|status`
-- `default-caveman-mode` — loads the installed `caveman` skill and applies it every turn, defaulting to ultra.
+- `default-caveman-mode` — loads the installed `caveman` skill once, then applies a tiny reminder every turn, defaulting to ultra.
   - Reads `~/.agents/skills/caveman/SKILL.md` first, then `~/.pi/agent/skills/caveman/SKILL.md`.
+  - Reinjects full skill source only when its hidden marker is missing (for example after compaction/branching or skill updates).
   - Command: `/caveman-default on|off|lite|full|ultra|status`
 
 ## Install on another PC

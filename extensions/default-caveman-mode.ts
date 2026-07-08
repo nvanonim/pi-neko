@@ -1,4 +1,5 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { createHash } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
@@ -17,7 +18,11 @@ function stripFrontmatter(markdown: string): string {
   return markdown.replace(/^---\n[\s\S]*?\n---\n?/, "").trim();
 }
 
-function loadCavemanSkill(): { prompt: string; source: string } {
+function hashText(text: string): string {
+  return createHash("sha1").update(text).digest("hex").slice(0, 8);
+}
+
+function loadCavemanSkill(): { prompt: string; source: string; hash: string } {
   const candidates = [
     join(homedir(), ".agents", "skills", "caveman", "SKILL.md"),
     join(homedir(), ".pi", "agent", "skills", "caveman", "SKILL.md"),
@@ -26,37 +31,79 @@ function loadCavemanSkill(): { prompt: string; source: string } {
   for (const path of candidates) {
     if (!existsSync(path)) continue;
     const skill = stripFrontmatter(readFileSync(path, "utf8"));
-    return {
-      source: path,
-      prompt: [
-        "Default response style: caveman skill, always active.",
-        "Apply the installed caveman skill instructions below.",
-        "Default intensity for this pi extension: ultra.",
-        "User can override with normal/verbose/stop caveman requests.",
-        "",
-        skill,
-      ].join("\n"),
-    };
+    return { source: path, prompt: skill, hash: hashText(skill) };
   }
 
-  return { source: "fallback built-in prompt", prompt: FALLBACK_PROMPT };
+  return { source: "fallback built-in prompt", prompt: FALLBACK_PROMPT, hash: hashText(FALLBACK_PROMPT) };
 }
 
 export default function (pi: ExtensionAPI) {
   let enabled = true;
   let level: CavemanLevel = "ultra";
   const loaded = loadCavemanSkill();
+  const marker = `[pi-neko:caveman-source:v1:${loaded.hash}]`;
 
-  pi.on("before_agent_start", (event) => {
+  function contentHasMarker(content: unknown): boolean {
+    if (typeof content === "string") return content.includes(marker);
+    if (!Array.isArray(content)) return false;
+    return content.some((part) => part?.type === "text" && typeof part.text === "string" && part.text.includes(marker));
+  }
+
+  function branchHasSource(ctx: { sessionManager: { getBranch(): Array<any> } }): boolean {
+    for (const entry of ctx.sessionManager.getBranch()) {
+      if (entry.type === "custom_message") {
+        if (contentHasMarker(entry.content)) return true;
+        if (entry.details?.marker === marker) return true;
+      }
+      if (entry.type === "message") {
+        if (contentHasMarker(entry.message?.content)) return true;
+        if (entry.message?.details?.marker === marker) return true;
+      }
+    }
+    return false;
+  }
+
+  function sourceMessage() {
+    return {
+      customType: "pi-neko-caveman-source",
+      display: false,
+      content: [
+        `${marker}`,
+        "Loaded caveman skill source for default-caveman-mode.",
+        "Apply this source only when the current system prompt contains the matching always-on reminder marker.",
+        "If the reminder is absent, treat this source as inactive reference material.",
+        `Source: ${loaded.source}`,
+        "",
+        loaded.prompt,
+        "",
+        `End ${marker}. Reminder required for activation.`,
+      ].join("\n"),
+      details: { marker, source: loaded.source, hash: loaded.hash },
+    };
+  }
+
+  function reminder(): string {
+    return [
+      "Always-on skill reminder: apply loaded caveman skill source " + marker + ".",
+      `Current caveman intensity: ${level}.`,
+      "Preserve exact code/API/path/error text. No tool-call narration.",
+      "Use Auto-Clarity for safety warnings, destructive confirmations, and ambiguous multi-step instructions.",
+      "User override: normal/verbose/stop caveman.",
+    ].join(" ");
+  }
+
+  pi.on("before_agent_start", (event, ctx) => {
     if (!enabled) return;
 
-    return {
-      systemPrompt: [
-        event.systemPrompt,
-        loaded.prompt,
-        `Current caveman intensity: ${level}.`,
-      ].join("\n\n"),
+    const result: { systemPrompt: string; message?: ReturnType<typeof sourceMessage> } = {
+      systemPrompt: [event.systemPrompt, reminder()].join("\n\n"),
     };
+
+    if (!branchHasSource(ctx)) {
+      result.message = sourceMessage();
+    }
+
+    return result;
   });
 
   pi.registerCommand("caveman-default", {
@@ -77,7 +124,7 @@ export default function (pi: ExtensionAPI) {
       }
 
       ctx.ui.notify(
-        `Caveman default: ${enabled ? level : "off"} (${loaded.source})`,
+        `Caveman default: ${enabled ? level : "off"} (${loaded.source}, ${loaded.hash})`,
         "info",
       );
     },
