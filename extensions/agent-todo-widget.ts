@@ -10,6 +10,7 @@
  *   /todos show|hide|toggle|clear|status
  */
 
+import { StringEnum } from "@earendil-works/pi-ai";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { Text, truncateToWidth } from "@earendil-works/pi-tui";
 import { Type, type Static } from "typebox";
@@ -37,11 +38,7 @@ interface TodoDetails {
 const WIDGET_ID = "agent-todo-widget";
 const STATE_ENTRY_TYPE = "agent-todo-widget-state";
 
-const TodoStatusSchema = Type.Union([
-  Type.Literal("not-started"),
-  Type.Literal("in-progress"),
-  Type.Literal("completed"),
-]);
+const TodoStatusSchema = StringEnum(["not-started", "in-progress", "completed"] as const);
 
 const TodoItemSchema = Type.Object({
   id: Type.Number({
@@ -57,7 +54,7 @@ const TodoItemSchema = Type.Object({
 });
 
 const ManageTodoListParams = Type.Object({
-  operation: Type.Union([Type.Literal("read"), Type.Literal("write")], {
+  operation: StringEnum(["read", "write"] as const, {
     description:
       "read returns the current todo list. write replaces the complete todo list; partial updates are not supported.",
   }),
@@ -301,22 +298,12 @@ export default function (pi: ExtensionAPI) {
 
       const todoList = params.todoList;
       if (!Array.isArray(todoList)) {
-        const todos = state.read();
-        return {
-          content: [{ type: "text" as const, text: "Error: todoList is required for write operation." }],
-          details: { operation: "write", todos, error: "todoList required" } satisfies TodoDetails,
-          isError: true,
-        };
+        throw new Error("todoList is required for write operation");
       }
 
       const errors = state.validate(todoList as TodoItem[]);
       if (errors.length > 0) {
-        const todos = state.read();
-        return {
-          content: [{ type: "text" as const, text: `Validation failed:\n${errors.map((e) => `- ${e}`).join("\n")}` }],
-          details: { operation: "write", todos, error: errors.join("; ") } satisfies TodoDetails,
-          isError: true,
-        };
+        throw new Error(`Todo list validation failed: ${errors.join("; ")}`);
       }
 
       state.write(todoList as TodoItem[]);
@@ -343,7 +330,11 @@ export default function (pi: ExtensionAPI) {
 
     renderResult(result, _options, theme) {
       const details = result.details as TodoDetails | undefined;
-      if (!details) return new Text("", 0, 0);
+      if (!details) {
+        const content = result.content[0];
+        const text = content?.type === "text" ? content.text : "";
+        return new Text(theme.fg("error", text), 0, 0);
+      }
       if (details.error) return new Text(theme.fg("error", details.error), 0, 0);
       const total = details.todos.length;
       const completed = details.todos.filter((todo) => todo.status === "completed").length;

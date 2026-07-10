@@ -49,8 +49,8 @@ export default function (pi: ExtensionAPI) {
     return content.some((part) => part?.type === "text" && typeof part.text === "string" && part.text.includes(marker));
   }
 
-  function branchHasSource(ctx: { sessionManager: { getBranch(): Array<any> } }): boolean {
-    for (const entry of ctx.sessionManager.getBranch()) {
+  function activeContextHasSource(ctx: { sessionManager: { buildContextEntries(): Array<any> } }): boolean {
+    for (const entry of ctx.sessionManager.buildContextEntries()) {
       if (entry.type === "custom_message") {
         if (contentHasMarker(entry.content)) return true;
         if (entry.details?.marker === marker) return true;
@@ -99,7 +99,7 @@ export default function (pi: ExtensionAPI) {
       systemPrompt: [event.systemPrompt, reminder()].join("\n\n"),
     };
 
-    if (!branchHasSource(ctx)) {
+    if (!activeContextHasSource(ctx)) {
       result.message = sourceMessage();
     }
 

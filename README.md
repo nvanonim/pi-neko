@@ -7,11 +7,12 @@ This repo bundles my pi extensions so they can be installed on other machines wi
 ## Included extensions
 
 - `minimal-textchat-footer` — replaces the default footer with a compact text footer.
-  - Dirty markers beside the branch: `+N` staged, `*N` unstaged, `?N` untracked.
+  - Dirty markers beside the branch: `+N` staged, `*N` unstaged, `?N` untracked. Files with both index and worktree changes count in both totals.
+  - Billing segment shows provider-reported `$cost` for API-key models and `subs` for OAuth/subscription models.
   - Command: `/textchat-footer on|off|toggle`
   - Changed files widget: `/git-changes show|hide|toggle`
   - Shortcut: `alt+g` or `f2` toggles changed-files widget (`option+g` on macOS if terminal sends Option as Meta)
-- `model-thinking-defaults` — automatically sets preferred thinking levels for selected models.
+- `model-thinking-defaults` — enforces preferred thinking levels for selected models, including the model restored at session startup. Startup changes are silent; interactive model changes notify when the level changes.
 - `markdown-code-preview` — renders markdown code blocks as preview-style blocks instead of visible triple-backtick fences.
   - Command: `/markdown-code-preview` checks/enables the patch.
   - Code block headers show `copy: /copy-code <id>`; run that command to copy raw code.
@@ -21,7 +22,7 @@ This repo bundles my pi extensions so they can be installed on other machines wi
   - Command: `/todos show|hide|toggle|clear|status`
 - `default-caveman-mode` — loads the installed `caveman` skill once, then applies a tiny reminder every turn, defaulting to ultra.
   - Reads `~/.agents/skills/caveman/SKILL.md` first, then `~/.pi/agent/skills/caveman/SKILL.md`.
-  - Reinjects full skill source only when its hidden marker is missing (for example after compaction/branching or skill updates).
+  - Reinjects full skill source only when its hidden marker is missing from active post-compaction context (for example after compaction/branching or skill updates).
   - Command: `/caveman-default on|off|lite|full|ultra|status`
 
 ## Install on another PC
@@ -74,15 +75,27 @@ After installing optional packages, restart Pi or run `/reload`.
 
 ```text
 .
-├── package.json          # pi package manifest
+├── package.json          # pi package manifest and development scripts
+├── package-lock.json     # pinned development toolchain
+├── tsconfig.json         # strict extension/test typechecking
 ├── extensions/           # extension entrypoints loaded by pi
 │   ├── agent-todo-widget.ts
 │   ├── default-caveman-mode.ts
 │   ├── markdown-code-preview.ts
 │   ├── minimal-textchat-footer.ts
 │   └── model-thinking-defaults.ts
+├── test/                 # Node test suite and Pi API mocks
 └── README.md
 ```
+
+## Development
+
+```bash
+npm install
+npm run check
+```
+
+`npm run check` runs strict TypeScript checking plus Node's native TypeScript test suite.
 
 ## Adding more pi resources
 

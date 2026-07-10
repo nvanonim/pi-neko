@@ -1,4 +1,4 @@
-import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 
 type ThinkingLevel = "off" | "minimal" | "low" | "medium" | "high" | "xhigh";
 
@@ -18,18 +18,29 @@ function preferredThinking(provider: string, id: string): ThinkingLevel | null {
 }
 
 export default function (pi: ExtensionAPI) {
-  pi.on("model_select", (event, ctx) => {
-    const desired = preferredThinking(event.model.provider, event.model.id);
-    if (!desired) return;
-    if (pi.getThinkingLevel() === desired) return;
+  function applyPreferredThinking(
+    model: { provider: string; id: string },
+    ctx: ExtensionContext,
+    notify: boolean,
+  ): void {
+    const desired = preferredThinking(model.provider, model.id);
+    if (!desired || pi.getThinkingLevel() === desired) return;
 
     pi.setThinkingLevel(desired);
 
-    if (ctx.hasUI) {
+    if (notify && ctx.hasUI) {
       ctx.ui.notify(
-        `Thinking default: ${event.model.provider}/${event.model.id} → ${desired}`,
+        `Thinking default: ${model.provider}/${model.id} → ${desired}`,
         "info",
       );
     }
+  }
+
+  pi.on("session_start", (_event, ctx) => {
+    if (ctx.model) applyPreferredThinking(ctx.model, ctx, false);
+  });
+
+  pi.on("model_select", (event, ctx) => {
+    applyPreferredThinking(event.model, ctx, true);
   });
 }
