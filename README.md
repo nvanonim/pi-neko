@@ -71,6 +71,26 @@ After installing optional packages, restart Pi or run `/reload`.
 - `pi-fork` — delegates noisy exploration, review, debugging, and planning to child Pi agents while keeping the main session cleaner. Good for MVP or big-feature work.
 - `pi-agent-browser-native` — adds the `agent_browser` tool for real browser sessions. Requires the separate `agent-browser` CLI on `PATH`.
 
+### Pi Guard (optional)
+
+[Pi Guard](https://github.com/FadhilP/pi-conductor/tree/v0.10.0/pi-guard), maintained by [FadhilP](https://github.com/FadhilP), adds confirmation gates for known destructive shell operations and protects sensitive workspace paths used by Pi's `write` and `edit` tools.
+
+Pi Guard is distributed inside the larger Pi Conductor bundle. To avoid loading Conductor extensions that overlap with `pi-neko`, add this filtered, pinned entry to the `packages` array in `~/.pi/agent/settings.json` instead of installing the bundle unfiltered:
+
+```json
+{
+  "source": "git:github.com/FadhilP/pi-conductor@v0.10.0",
+  "extensions": [
+    "pi-guard/extensions/pi-guard.ts"
+  ],
+  "skills": [],
+  "prompts": [],
+  "themes": []
+}
+```
+
+Restart Pi or run `/reload`, then use `/guard` to inspect session counters. Pi Guard is defense-in-depth, not a sandbox or complete shell parser; review commands before approving them.
+
 ## Repo layout
 
 ```text
