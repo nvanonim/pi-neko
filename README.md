@@ -20,6 +20,10 @@ This repo bundles my pi extensions so they can be installed on other machines wi
   - Note: patches Pi's internal Markdown renderer, so Pi upgrades may require updates.
 - `agent-todo-widget` — gives the agent a `manage_todo_list` tool and shows plan progress above the editor.
   - Command: `/todos show|hide|toggle|clear|status`
+- `ask-user` — gives the agent an `ask_user` question box for material, non-discoverable decisions.
+  - Supports 1–3 questions, multiple-choice selection, optional multi-select, custom answers, review, and cancellation.
+  - TUI-only. It rejects calls in print, JSON, and RPC modes rather than inventing an answer.
+  - Use it after repository exploration for decisions that materially change work; do not use it for permission questions or facts the agent can discover.
 - `default-caveman-mode` — loads the installed `caveman` skill once, then applies a tiny reminder every turn, defaulting to ultra.
   - Reads `~/.agents/skills/caveman/SKILL.md` first, then `~/.pi/agent/skills/caveman/SKILL.md`.
   - Reinjects full skill source only when its hidden marker is missing from active post-compaction context (for example after compaction/branching or skill updates).
@@ -100,6 +104,7 @@ Restart Pi or run `/reload`, then use `/guard` to inspect session counters. Pi G
 ├── tsconfig.json         # strict extension/test typechecking
 ├── extensions/           # extension entrypoints loaded by pi
 │   ├── agent-todo-widget.ts
+│   ├── ask-user.ts
 │   ├── default-caveman-mode.ts
 │   ├── markdown-code-preview.ts
 │   ├── minimal-textchat-footer.ts

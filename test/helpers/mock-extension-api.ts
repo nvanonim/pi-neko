@@ -29,6 +29,9 @@ export interface MockExtensionHarness {
     thinkingLevel: string;
     oauthProviders: Set<string>;
     footerFactory: any;
+    customResult: unknown;
+    customPending: boolean;
+    customComponent: any;
     execResult: { stdout: string; stderr: string; code: number; killed: boolean };
   };
   emit(type: string, event?: Record<string, unknown>): Promise<unknown[]>;
@@ -53,6 +56,9 @@ export function createMockExtensionHarness(): MockExtensionHarness {
     thinkingLevel: "off",
     oauthProviders: new Set<string>(),
     footerFactory: undefined as any,
+    customResult: undefined as unknown,
+    customPending: false,
+    customComponent: undefined as any,
     execResult: { stdout: "", stderr: "", code: 0, killed: false },
   };
 
@@ -70,6 +76,15 @@ export function createMockExtensionHarness(): MockExtensionHarness {
     },
     setFooter(factory: unknown) {
       state.footerFactory = factory;
+    },
+    async custom(factory: any) {
+      if (!state.customPending) {
+        state.customComponent = factory({ requestRender() {} }, createIdentityTheme(), {}, () => {});
+        return state.customResult;
+      }
+      return new Promise((resolve) => {
+        state.customComponent = factory({ requestRender() {} }, createIdentityTheme(), {}, resolve);
+      });
     },
     theme: createIdentityTheme(),
   };
