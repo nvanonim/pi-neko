@@ -125,6 +125,7 @@ test("modal keyboard flow selects multiple answers then submits review", async (
   harness.state.customComponent.handleInput(" ");
   harness.state.customComponent.handleInput("\t");
   harness.state.customComponent.handleInput("\r");
+  assert.match(harness.state.customComponent.render(120).join("\n"), /Tab\/←→ change answers/);
   harness.state.customComponent.handleInput("\r");
   const result = await pending;
 

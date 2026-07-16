@@ -275,7 +275,7 @@ export default function askUser(pi: ExtensionAPI) {
               addWrapped(lines, renderWidth, " ", theme.fg("muted", `${question.header}: `) + theme.fg("text", answerText(answer) || "Unanswered"));
             }
             lines.push("");
-            addWrapped(lines, renderWidth, " ", theme.fg(allAnswered(state, questions) ? "success" : "warning", allAnswered(state, questions) ? "Enter to submit" : "Answer every question before submitting"));
+            addWrapped(lines, renderWidth, " ", theme.fg(allAnswered(state, questions) ? "success" : "warning", allAnswered(state, questions) ? "Enter submit · Tab/←→ change answers · Esc cancel" : "Answer every question before submitting"));
           } else {
             const question = activeQuestion()!;
             const choices = options(question);
