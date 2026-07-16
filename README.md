@@ -75,17 +75,18 @@ After installing optional packages, restart Pi or run `/reload`.
 - `pi-fork` — delegates noisy exploration, review, debugging, and planning to child Pi agents while keeping the main session cleaner. Good for MVP or big-feature work.
 - `pi-agent-browser-native` — adds the `agent_browser` tool for real browser sessions. Requires the separate `agent-browser` CLI on `PATH`.
 
-### Pi Guard (optional)
+### Pi Guard and Pi Verify (optional)
 
-[Pi Guard](https://github.com/FadhilP/pi-conductor/tree/v0.10.0/pi-guard), maintained by [FadhilP](https://github.com/FadhilP), adds confirmation gates for known destructive shell operations and protects sensitive workspace paths used by Pi's `write` and `edit` tools.
+[Pi Guard](https://github.com/FadhilP/pi-conductor/tree/v0.10.2/pi-guard), maintained by [FadhilP](https://github.com/FadhilP), adds confirmation gates for known destructive shell operations and protects sensitive workspace paths used by Pi's `write` and `edit` tools. [Pi Verify](https://github.com/FadhilP/pi-conductor/tree/v0.10.2/pi-verify) runs bounded, detected project checks after code changes.
 
-Pi Guard is distributed inside the larger Pi Conductor bundle. To avoid loading Conductor extensions that overlap with `pi-neko`, add this filtered, pinned entry to the `packages` array in `~/.pi/agent/settings.json` instead of installing the bundle unfiltered:
+Both ship inside Pi Conductor. To avoid loading Conductor extensions that overlap with `pi-neko`, add this filtered, pinned entry to the `packages` array in `~/.pi/agent/settings.json` instead of installing the bundle unfiltered:
 
 ```json
 {
-  "source": "git:github.com/FadhilP/pi-conductor@v0.10.0",
+  "source": "git:github.com/FadhilP/pi-conductor@v0.10.2",
   "extensions": [
-    "pi-guard/extensions/pi-guard.ts"
+    "pi-guard/extensions/pi-guard.ts",
+    "pi-verify/extensions/pi-verify.ts"
   ],
   "skills": [],
   "prompts": [],
@@ -93,7 +94,7 @@ Pi Guard is distributed inside the larger Pi Conductor bundle. To avoid loading 
 }
 ```
 
-Restart Pi or run `/reload`, then use `/guard` to inspect session counters. Pi Guard is defense-in-depth, not a sandbox or complete shell parser; review commands before approving them.
+Restart Pi or run `/reload`. Use `/guard` to inspect Guard session counters. Agents call `verify({ scope: "changed" | "project", checks?: string[] })`; it runs `git diff --check` for dirty worktrees, then declared checks. Maven projects with `pom.xml` use `./mvnw test` when a wrapper exists; this does not replace project-specific `./mvnw verify`, Sonar, or integration checks. Pi Guard is defense-in-depth, not a sandbox or complete shell parser; review commands before approving them.
 
 ## Repo layout
 
