@@ -13,6 +13,7 @@ import {
   toggleOption,
   validateQuestions,
 } from "../lib/ask-user-state.ts";
+import { ASK_USER_RELAY_ENV } from "../lib/ask-user-relay.ts";
 import { createIdentityTheme, createMockExtensionHarness } from "./helpers/mock-extension-api.ts";
 
 const rawQuestions = [
@@ -221,18 +222,85 @@ test("returns cancellation without inventing an answer", async () => {
   assert.match(result.content[0]?.text ?? "", /cancelled/);
 });
 
-test("throws for invalid requests and non-TUI execution", async () => {
+test("closes an active question when its caller aborts", async () => {
+  const { harness, tool } = setup();
+  harness.state.customPending = true;
+  const controller = new AbortController();
+  const pending = tool.execute("ask-1", { questions: rawQuestions }, controller.signal, undefined, harness.ctx);
+  await Promise.resolve();
+
+  controller.abort();
+  const result = await pending;
+
+  assert.equal(result.details.cancelled, true);
+});
+
+test("relays a JSON child question to the parent TUI", async () => {
+  const parent = setup();
+  const child = setup();
+  parent.harness.state.customResult = {
+    questions: normalizeQuestions(rawQuestions),
+    answers: [
+      { id: "platforms", values: ["Web (Recommended)"], custom: [] },
+      { id: "storage", values: ["PostgreSQL (Recommended)"], custom: [] },
+    ],
+    cancelled: false,
+  };
+
+  await parent.harness.emit("session_start", { reason: "startup" });
+  try {
+    (child.harness.ctx as any).mode = "json";
+    const result = await child.tool.execute("ask-child", { questions: rawQuestions }, undefined, undefined, child.harness.ctx);
+
+    assert.match(result.content[0]?.text ?? "", /platforms: Web \(Recommended\)/);
+    assert.equal(result.details.cancelled, false);
+    assert.ok(parent.harness.state.customComponent);
+  } finally {
+    await parent.harness.emit("session_shutdown", { reason: "quit" });
+  }
+});
+
+test("child abort closes its relayed parent dialog", async () => {
+  const parent = setup();
+  const child = setup();
+  parent.harness.state.customPending = true;
+
+  await parent.harness.emit("session_start", { reason: "startup" });
+  try {
+    (child.harness.ctx as any).mode = "json";
+    const controller = new AbortController();
+    const pending = child.tool.execute("ask-child", { questions: rawQuestions }, controller.signal, undefined, child.harness.ctx);
+    for (let attempt = 0; attempt < 20 && !parent.harness.state.customComponent; attempt++) {
+      await new Promise((resolve) => setTimeout(resolve, 5));
+    }
+    assert.ok(parent.harness.state.customComponent);
+
+    controller.abort();
+    await assert.rejects(pending, /relay cancelled/);
+  } finally {
+    await parent.harness.emit("session_shutdown", { reason: "quit" });
+  }
+});
+
+test("throws for invalid requests and non-TUI execution without a relay", async () => {
   const { harness, tool } = setup();
   await assert.rejects(
     tool.execute("ask-1", { questions: [{ ...rawQuestions[0]!, options: [rawQuestions[0]!.options[0]!] }] }, undefined, undefined, harness.ctx),
     /ask_user validation failed/,
   );
 
-  (harness.ctx as any).mode = "print";
-  await assert.rejects(
-    tool.execute("ask-2", { questions: rawQuestions }, undefined, undefined, harness.ctx),
-    /requires an interactive TUI/,
-  );
+  const previousRelay = process.env[ASK_USER_RELAY_ENV];
+  delete process.env[ASK_USER_RELAY_ENV];
+  try {
+    (harness.ctx as any).mode = "print";
+    await assert.rejects(
+      tool.execute("ask-2", { questions: rawQuestions }, undefined, undefined, harness.ctx),
+      /requires an interactive TUI/,
+    );
+  } finally {
+    if (previousRelay === undefined) delete process.env[ASK_USER_RELAY_ENV];
+    else process.env[ASK_USER_RELAY_ENV] = previousRelay;
+  }
 });
 
 test("renders cancellation, answers, and tool-error fallback", () => {

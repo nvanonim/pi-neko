@@ -22,7 +22,8 @@ This repo bundles my pi extensions so they can be installed on other machines wi
   - Command: `/todos show|hide|toggle|clear|status`
 - `ask-user` — gives the agent an `ask_user` question box for material, non-discoverable decisions.
   - Supports 1–3 questions, multiple-choice selection, optional multi-select, custom answers, review, and cancellation.
-  - TUI-only. It rejects calls in print, JSON, and RPC modes rather than inventing an answer.
+  - Direct use is TUI-only. Child Pi processes (including `pi-fork` JSON workers) inherit a private local relay and show their questions in the parent TUI; standalone print, JSON, and RPC calls still reject rather than inventing an answer.
+  - Concurrent child questions are queued so only one parent dialog owns terminal input at a time.
   - Use it after repository exploration for decisions that materially change work; do not use it for permission questions or facts the agent can discover.
 - `default-caveman-mode` — loads the installed `caveman` skill once, then applies a tiny reminder every turn, defaulting to ultra.
   - Reads `~/.agents/skills/caveman/SKILL.md` first, then `~/.pi/agent/skills/caveman/SKILL.md`.

@@ -1,4 +1,4 @@
-import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { defineTool, type ExtensionAPI, type ExtensionContext } from "@earendil-works/pi-coding-agent";
 import {
   Editor,
   type EditorTheme,
@@ -20,8 +20,15 @@ import {
   toggleOption,
   validateQuestions,
   type AskUserAnswer,
+  type AskUserDetails,
   type AskUserQuestion,
 } from "../lib/ask-user-state.ts";
+import {
+  ASK_USER_RELAY_ENV,
+  requestAskUserRelay,
+  startAskUserRelay,
+  type AskUserRelayServer,
+} from "../lib/ask-user-relay.ts";
 
 const OptionSchema = Type.Object({
   label: Type.String({ description: "Display label, 1-5 words. Put recommended choice first and suffix it with (Recommended)." }),
@@ -46,12 +53,6 @@ const AskUserParams = Type.Object({
 }, { additionalProperties: false });
 
 type AskUserInput = Static<typeof AskUserParams>;
-
-type AskUserDetails = {
-  questions: AskUserQuestion[];
-  answers: AskUserAnswer[];
-  cancelled: boolean;
-};
 
 const TOOL_DESCRIPTION = `Ask the user 1-3 material, non-discoverable questions during execution. Use only after exploring facts the repository or system can answer.
 
@@ -86,8 +87,16 @@ function addWrapped(lines: string[], width: number, prefix: string, text: string
   }
 }
 
+function formatResult(details: AskUserDetails) {
+  if (details.cancelled) {
+    return { content: [{ type: "text" as const, text: "User cancelled ask_user." }], details };
+  }
+  const text = details.answers.map((answer) => `${answer.id}: ${answerText(answer)}`).join("\n");
+  return { content: [{ type: "text" as const, text }], details };
+}
+
 export default function askUser(pi: ExtensionAPI) {
-  pi.registerTool({
+  const tool = defineTool({
     name: "ask_user",
     label: "Ask User",
     description: TOOL_DESCRIPTION,
@@ -99,16 +108,23 @@ export default function askUser(pi: ExtensionAPI) {
     parameters: AskUserParams,
     executionMode: "sequential",
 
-    async execute(_toolCallId, params: AskUserInput, _signal, _onUpdate, ctx) {
-      if (ctx.mode !== "tui") {
-        throw new Error("ask_user requires an interactive TUI");
-      }
-
+    async execute(_toolCallId: string, params: AskUserInput, signal: AbortSignal | undefined, _onUpdate: unknown, ctx: ExtensionContext) {
       const questions = normalizeQuestions(params.questions);
       const errors = validateQuestions(questions);
       if (errors.length > 0) {
         throw new Error(`ask_user validation failed: ${errors.join("; ")}`);
       }
+
+      if (ctx.mode !== "tui") {
+        const relayAddress = process.env[ASK_USER_RELAY_ENV];
+        if (!relayAddress) throw new Error("ask_user requires an interactive TUI");
+        return formatResult(await requestAskUserRelay(relayAddress, questions, signal));
+      }
+
+      if (signal?.aborted) throw new Error("ask_user cancelled");
+      let cancelPrompt: (() => void) | undefined;
+      const onAbort = () => cancelPrompt?.();
+      signal?.addEventListener("abort", onAbort, { once: true });
 
       const result = await ctx.ui.custom<AskUserDetails | undefined>((tui, theme, _keybindings, done) => {
         let state = createAskUserState();
@@ -135,6 +151,8 @@ export default function askUser(pi: ExtensionAPI) {
         const finish = (cancelled: boolean) => {
           done({ questions, answers: resultAnswers(state, questions), cancelled });
         };
+        cancelPrompt = () => finish(true);
+        if (signal?.aborted) cancelPrompt();
         const activeQuestion = () => questions[state.tab];
         const isReview = () => state.tab === questions.length;
         const options = (question: AskUserQuestion): DisplayChoice[] => {
@@ -320,14 +338,10 @@ export default function askUser(pi: ExtensionAPI) {
           },
           handleInput,
         };
-      });
+      }).finally(() => signal?.removeEventListener("abort", onAbort));
 
       const details: AskUserDetails = result ?? { questions, answers: [], cancelled: true };
-      if (details.cancelled) {
-        return { content: [{ type: "text" as const, text: "User cancelled ask_user." }], details };
-      }
-      const text = details.answers.map((answer) => `${answer.id}: ${answerText(answer)}`).join("\n");
-      return { content: [{ type: "text" as const, text }], details };
+      return formatResult(details);
     },
 
     renderCall(args: AskUserInput, theme) {
@@ -353,5 +367,36 @@ export default function askUser(pi: ExtensionAPI) {
         0,
       );
     },
+  });
+
+  pi.registerTool(tool);
+
+  let relay: AskUserRelayServer | undefined;
+  let previousRelayAddress: string | undefined;
+  let relayQueue: Promise<void> = Promise.resolve();
+
+  pi.on("session_start", async (_event, ctx) => {
+    if (ctx.mode !== "tui") return;
+    previousRelayAddress = process.env[ASK_USER_RELAY_ENV];
+    relay = await startAskUserRelay((questions, signal) => {
+      const pending = relayQueue.then(async () => {
+        const result = await tool.execute("ask-user-relay", { questions }, signal, undefined, ctx);
+        return result.details;
+      });
+      relayQueue = pending.then(() => undefined, () => undefined);
+      return pending;
+    });
+    process.env[ASK_USER_RELAY_ENV] = relay.address;
+  });
+
+  pi.on("session_shutdown", async (_event, ctx) => {
+    if (ctx.mode !== "tui" || !relay) return;
+    const address = relay.address;
+    await relay.close();
+    relay = undefined;
+    if (process.env[ASK_USER_RELAY_ENV] === address) {
+      if (previousRelayAddress === undefined) delete process.env[ASK_USER_RELAY_ENV];
+      else process.env[ASK_USER_RELAY_ENV] = previousRelayAddress;
+    }
   });
 }

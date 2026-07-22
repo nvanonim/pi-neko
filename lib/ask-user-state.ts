@@ -18,6 +18,12 @@ export interface AskUserAnswer {
   custom: string[];
 }
 
+export interface AskUserDetails {
+  questions: AskUserQuestion[];
+  answers: AskUserAnswer[];
+  cancelled: boolean;
+}
+
 export interface AskUserState {
   tab: number;
   optionIndex: number;
