@@ -16,6 +16,7 @@ This repo bundles my pi extensions so they can be installed on other machines wi
 - `markdown-code-preview` — renders markdown code blocks as preview-style blocks instead of visible triple-backtick fences.
   - Command: `/markdown-code-preview` checks/enables the patch.
   - Code block headers show `copy: /copy-code <id>`; run that command to copy raw code.
+  - Linux clipboard support uses `wl-copy`, `xclip`, or `xsel`; Wayland users can install `wl-clipboard` when OSC52 is unsupported (`sudo apt install wl-clipboard` on Ubuntu/Zorin).
   - Preview uses a subtle blue/cyan-tinted code-line background instead of left/right border glyphs, so mouse selection does not copy `│` characters.
   - Note: patches Pi's internal Markdown renderer, so Pi upgrades may require updates.
 - `agent-todo-widget` — gives the agent a `manage_todo_list` tool and shows plan progress above the editor.

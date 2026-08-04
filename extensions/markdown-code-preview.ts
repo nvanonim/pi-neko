@@ -184,7 +184,22 @@ export default function (pi: ExtensionAPI) {
         return;
       }
 
-      ctx.ui.notify(method === "osc52" ? "Code copied via OSC52" : "Code copied", "info");
+      if (method === "osc52") {
+        let message = "OSC52 copy fallback used; terminal support is unverified.";
+        if (process.platform === "linux") {
+          if (process.env.WAYLAND_DISPLAY) {
+            message = "No working clipboard tool found. Install wl-clipboard: sudo apt install wl-clipboard";
+          } else if (process.env.DISPLAY) {
+            message = "No working clipboard tool found. Install xclip or xsel: sudo apt install xclip";
+          } else {
+            message = "No working clipboard tool found. Install wl-clipboard, xclip, or xsel.";
+          }
+        }
+        ctx.ui.notify(message, "warning");
+        return;
+      }
+
+      ctx.ui.notify("Code copied", "info");
     },
   });
 }
