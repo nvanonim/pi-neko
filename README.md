@@ -13,6 +13,14 @@ This repo bundles my pi extensions so they can be installed on other machines wi
   - Changed files widget: `/git-changes show|hide|toggle`
   - Shortcut: `alt+g` or `f2` toggles changed-files widget (`option+g` on macOS if terminal sends Option as Meta)
 - `model-thinking-defaults` — enforces preferred thinking levels for selected models, including the model restored at session startup. Startup changes are silent; interactive model changes notify when the level changes.
+- `pi-change-review` — saves prompt-scoped before/after snapshots for Pi `edit` and `write` calls, then opens native diffs in Zed, VS Code, Codium, or a custom editor.
+  - Commands: `/review open|list|status|report|clear [latest|id|all]` (`/pi-review` remains an alias).
+  - Storage: `~/.pi/agent/change-reviews/`, scoped to the current Pi session; no project files, commits, or stashes are created.
+  - Editor selection is automatic (`zed`, then `code`, then `codium`), or configure `~/.pi/agent/change-review.json` / trusted `.pi/change-review.json`:
+    ```json
+    { "editor": "custom", "command": "my-editor", "args": ["--diff", "{before}", "{after}"] }
+    ```
+  - Bash-only changes are detected through Git status but marked ambiguous; exact attribution is for Pi `edit` and `write` calls.
 - `markdown-code-preview` — renders markdown code blocks as preview-style blocks instead of visible triple-backtick fences.
   - Command: `/markdown-code-preview` checks/enables the patch.
   - Code block headers show `copy: /copy-code <id>`; run that command to copy raw code.
@@ -111,7 +119,8 @@ Restart Pi or run `/reload`. Use `/guard` to inspect Guard session counters. Age
 │   ├── default-caveman-mode.ts
 │   ├── markdown-code-preview.ts
 │   ├── minimal-textchat-footer.ts
-│   └── model-thinking-defaults.ts
+│   ├── model-thinking-defaults.ts
+│   └── pi-change-review.ts
 ├── test/                 # Node test suite and Pi API mocks
 └── README.md
 ```
