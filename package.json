@@ -7,6 +7,9 @@
     "pi-package"
   ],
   "type": "module",
+  "engines": {
+    "node": ">=22.19.0"
+  },
   "scripts": {
     "test": "node --test \"test/**/*.test.ts\"",
     "typecheck": "tsc --noEmit -p tsconfig.json",
@@ -15,7 +18,13 @@
   "pi": {
     "extensions": [
       "./extensions"
+    ],
+    "skills": [
+      "./skills"
     ]
+  },
+  "dependencies": {
+    "@fadhilp/stateql": "0.13.2"
   },
   "peerDependencies": {
     "@earendil-works/pi-ai": "*",

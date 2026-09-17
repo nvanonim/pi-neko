@@ -22,6 +22,7 @@ export interface MockExtensionHarness {
   appendedEntries: Array<{ customType: string; data: unknown }>;
   execCalls: Array<{ command: string; args: string[]; options: unknown }>;
   thinkingChanges: string[];
+  confirmations: Array<{ title: string; message: string }>;
   state: {
     branch: any[];
     contextEntries: any[];
@@ -33,6 +34,9 @@ export interface MockExtensionHarness {
     customPending: boolean;
     customComponent: any;
     execResult: { stdout: string; stderr: string; code: number; killed: boolean };
+    sessionId: string;
+    activeTools: string[];
+    confirmationResults: boolean[];
   };
   emit(type: string, event?: Record<string, unknown>): Promise<unknown[]>;
 }
@@ -48,6 +52,7 @@ export function createMockExtensionHarness(): MockExtensionHarness {
   const appendedEntries: Array<{ customType: string; data: unknown }> = [];
   const execCalls: Array<{ command: string; args: string[]; options: unknown }> = [];
   const thinkingChanges: string[] = [];
+  const confirmations: Array<{ title: string; message: string }> = [];
 
   const state = {
     branch: [] as any[],
@@ -60,6 +65,9 @@ export function createMockExtensionHarness(): MockExtensionHarness {
     customPending: false,
     customComponent: undefined as any,
     execResult: { stdout: "", stderr: "", code: 0, killed: false },
+    sessionId: "test-session",
+    activeTools: [] as string[],
+    confirmationResults: [] as boolean[],
   };
 
   const ui = {
@@ -76,6 +84,10 @@ export function createMockExtensionHarness(): MockExtensionHarness {
     },
     setFooter(factory: unknown) {
       state.footerFactory = factory;
+    },
+    async confirm(title: string, message: string) {
+      confirmations.push({ title, message });
+      return state.confirmationResults.shift() ?? true;
     },
     async custom(factory: any) {
       if (!state.customPending) {
@@ -96,6 +108,7 @@ export function createMockExtensionHarness(): MockExtensionHarness {
     cwd: "/tmp/project",
     sessionManager: {
       getBranch: () => state.branch,
+      getSessionId: () => state.sessionId,
       buildContextEntries: () => state.contextEntries,
     },
     modelRegistry: {
@@ -125,6 +138,7 @@ export function createMockExtensionHarness(): MockExtensionHarness {
     },
     registerTool(tool: any) {
       tools.set(tool.name, tool);
+      if (!state.activeTools.includes(tool.name)) state.activeTools.push(tool.name);
     },
     registerShortcut(key: string, options: unknown) {
       shortcuts.set(key, options);
@@ -138,6 +152,11 @@ export function createMockExtensionHarness(): MockExtensionHarness {
       state.thinkingLevel = level;
       thinkingChanges.push(level);
     },
+    getActiveTools: () => [...state.activeTools],
+    setActiveTools(names: string[]) {
+      state.activeTools = [...names];
+    },
+    getAllTools: () => [...tools.values()],
     async exec(command: string, args: string[], options: unknown) {
       execCalls.push({ command, args, options });
       return state.execResult;
@@ -158,6 +177,7 @@ export function createMockExtensionHarness(): MockExtensionHarness {
     appendedEntries,
     execCalls,
     thinkingChanges,
+    confirmations,
     state,
     async emit(type: string, event: Record<string, unknown> = {}) {
       const results: unknown[] = [];

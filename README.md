@@ -16,7 +16,8 @@ This repo bundles my pi extensions so they can be installed on other machines wi
 - `pi-change-review` — saves prompt-scoped before/after snapshots for Pi `edit` and `write` calls, then opens native diffs in Zed, VS Code, Codium, or a custom editor.
   - Commands: `/review open|list|status|report|clear [latest|id|all]` (`/pi-review` remains an alias).
   - Storage: `~/.pi/agent/change-reviews/`, scoped to the current Pi session; no project files, commits, or stashes are created.
-  - Editor selection is automatic (`zed`, then `code`, then `codium`), or configure `~/.pi/agent/change-review.json` / trusted `.pi/change-review.json`:
+  - Editor selection is automatic (`zed`, then `code`, then `codium`); each editor CLI must be in `PATH`. On macOS, expose Zed app CLI with `ln -s /Applications/Zed.app/Contents/MacOS/zed /opt/homebrew/bin/zed`.
+  - Or configure `~/.pi/agent/change-review.json` / trusted `.pi/change-review.json`:
     ```json
     { "editor": "custom", "command": "my-editor", "args": ["--diff", "{before}", "{after}"] }
     ```
@@ -37,7 +38,49 @@ This repo bundles my pi extensions so they can be installed on other machines wi
 - `default-caveman-mode` — loads the installed `caveman` skill once, then applies a tiny reminder every turn, defaulting to ultra.
   - Reads `~/.agents/skills/caveman/SKILL.md` first, then `~/.pi/agent/skills/caveman/SKILL.md`.
   - Reinjects full skill source only when its hidden marker is missing from active post-compaction context (for example after compaction/branching or skill updates).
-  - Command: `/caveman-default on|off|lite|full|ultra|status`
+  - Command: `/caveman-default on|off|lite|full|ultra|wenyan-lite|wenyan-full|wenyan-ultra|status`
+- `neko-stateql` — provides namespaced, stateful database access through [StateQL](https://github.com/FadhilP/stateql), created and maintained by [FadhilP](https://github.com/FadhilP).
+  - `neko_stateql` handles read-only connections, bounded SQL/MongoDB/Redis reads, catalog inspection, and durable result handles.
+  - `neko_stateql_write` handles confirmed plans, writes, profile changes, and transactions. Every Pi session starts in read mode.
+  - Command: `/neko-stateql status|read|write`
+  - Requires Node.js 22.19.0 or newer (Pi's minimum; StateQL itself requires 22.16).
+
+## Neko StateQL
+
+Neko StateQL is an independent pi-neko integration for [`@fadhilp/stateql`](https://www.npmjs.com/package/@fadhilp/stateql). It is not affiliated with or endorsed by the StateQL author. StateQL is distributed under the MIT License.
+
+Remote credentials must be supplied through environment variables, never chat or tool arguments. Set the complete database URL before starting Pi:
+
+```bash
+export COMPANY_DATABASE_URL='postgresql://user:password@host/database'
+pi
+```
+
+The agent connects using only the variable name:
+
+```json
+{
+  "command": "connect",
+  "secret_env": "COMPANY_DATABASE_URL"
+}
+```
+
+The read tool forces read-only mode. SQL, parameters, and returned rows may enter Pi history and be sent to the selected model provider. Use a database account with server-side read-only permissions for normal company work.
+
+StateQL profiles save a friendly name, environment-variable name, and access policy without storing the credential URL. Configure environment values before starting Pi:
+
+```bash
+export COMPANY_SIT_DATABASE_URL='postgresql://user:password@sit-host/database'
+export COMPANY_UAT_DATABASE_URL='postgresql://user:password@uat-host/database'
+```
+
+After `/neko-stateql write`, ask the agent to save read-only profiles such as `company-sit` using `COMPANY_SIT_DATABASE_URL` and `company-uat` using `COMPANY_UAT_DATABASE_URL`. Return to `/neko-stateql read`. Future sessions can connect using only `{ "command": "connect", "profile": "company-sit" }`. Profile configuration persists in the isolated Neko StateQL home; environment values must still be available when Pi starts.
+
+Writes require two levels of approval: the user first runs `/neko-stateql write` for the current Pi session, then confirms each write operation. Unbounded and destructive overrides receive separate confirmations. New sessions start in read mode. An `OUTCOME_UNKNOWN` response immediately returns to read mode and must never be retried automatically.
+
+This lock governs the Neko StateQL tools only; it is defense-in-depth, not a process sandbox. Pi's shell tool and external database clients run with the user's OS permissions. Do not use them to bypass the lock, and inject write-capable credentials only for intentional write work where practical. Server-side database permissions remain the authoritative boundary.
+
+StateQL state is isolated from Pylon and other StateQL installations under `~/.pi/agent/state/neko-stateql/`. Set `PI_NEKO_STATEQL_HOME` to override it. Materialized rows and history may be stored there, so treat the directory as database data and do not sync or commit it.
 
 ## Install on another PC
 
@@ -120,7 +163,11 @@ Restart Pi or run `/reload`. Use `/guard` to inspect Guard session counters. Age
 │   ├── markdown-code-preview.ts
 │   ├── minimal-textchat-footer.ts
 │   ├── model-thinking-defaults.ts
+│   ├── neko-stateql.ts
 │   └── pi-change-review.ts
+├── lib/                  # shared extension runtime and state helpers
+├── skills/
+│   └── neko-stateql/     # StateQL workflow and safety guidance
 ├── test/                 # Node test suite and Pi API mocks
 └── README.md
 ```
