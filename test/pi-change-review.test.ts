@@ -1,17 +1,67 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { buildEditorLaunches, reportOpenLaunch, selectReviewId, validConfig } from "../extensions/pi-change-review.ts";
+import { buildEditorLaunches, chooseEditor, editorProbeArgs, reportOpenLaunch, selectReviewId, validConfig } from "../extensions/pi-change-review.ts";
 
 const files = [
   { beforePath: "/tmp/review/before/a.ts", afterPath: "/work/a.ts" },
   { beforePath: "/tmp/review/before/b.ts", afterPath: "/work/b.ts" },
 ];
 
-test("builds one Zed launch with every diff pair", () => {
-  assert.deepEqual(buildEditorLaunches("zed", files, "/tmp/review/report.md"), [
+test("probes Zed with --help for macOS compatibility", () => {
+  assert.deepEqual(editorProbeArgs("zed"), ["--help"]);
+});
+
+test("selects Zed before VS Code and Codium", async () => {
+  const calls: string[] = [];
+  const selected = await chooseEditor({}, async (command) => {
+    calls.push(command);
+    return command === "zed";
+  });
+  assert.equal(selected, "zed");
+  assert.deepEqual(calls, ["zed"]);
+});
+
+test("falls back through editor priority after unavailable probes", async () => {
+  const calls: string[] = [];
+  const selected = await chooseEditor({}, async (command) => {
+    calls.push(command);
+    return command === "codium";
+  });
+  assert.equal(selected, "codium");
+  assert.deepEqual(calls, ["zed", "code", "codium"]);
+});
+
+test("uses report when every editor probe fails", async () => {
+  assert.equal(await chooseEditor({}, async () => false), "report");
+});
+
+test("honors explicitly configured editor without probing", async () => {
+  let probes = 0;
+  assert.equal(await chooseEditor({ editor: "vscode" }, async () => {
+    probes += 1;
+    return true;
+  }), "vscode");
+  assert.equal(probes, 0);
+});
+
+test("builds one Linux Zed launch with every diff pair", () => {
+  assert.deepEqual(buildEditorLaunches("zed", files, "/tmp/review/report.md", {}, "linux"), [
     {
       command: "zed",
       args: [
+        "--diff", "/tmp/review/before/a.ts", "/work/a.ts",
+        "--diff", "/tmp/review/before/b.ts", "/work/b.ts",
+      ],
+    },
+  ]);
+});
+
+test("launches macOS Zed through open so Pi cannot kill it on timeout", () => {
+  assert.deepEqual(buildEditorLaunches("zed", files, "/tmp/review/report.md", {}, "darwin"), [
+    {
+      command: "open",
+      args: [
+        "-a", "Zed", "--args",
         "--diff", "/tmp/review/before/a.ts", "/work/a.ts",
         "--diff", "/tmp/review/before/b.ts", "/work/b.ts",
       ],
@@ -46,7 +96,7 @@ test("uses the custom command template for each diff", () => {
 });
 
 test("opens the report when no structured diff is available", () => {
-  assert.deepEqual(buildEditorLaunches("zed", [{ beforePath: undefined, afterPath: undefined }], "/tmp/review/report.md"), [
+  assert.deepEqual(buildEditorLaunches("zed", [{ beforePath: undefined, afterPath: undefined }], "/tmp/review/report.md", {}, "darwin"), [
     reportOpenLaunch("/tmp/review/report.md"),
   ]);
 });

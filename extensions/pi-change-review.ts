@@ -107,13 +107,19 @@ export function buildEditorLaunches(
   files: Array<Pick<FileReview, "beforePath" | "afterPath">>,
   reportPath: string,
   config: EditorConfig = {},
+  platform: NodeJS.Platform = process.platform,
 ): Array<{ command: string; args: string[] }> {
   const diffs = files.filter((file) => file.beforePath && file.afterPath) as Array<
     Required<Pick<FileReview, "beforePath" | "afterPath">>
   >;
 
   if (editor === "report" || diffs.length === 0) return [reportOpenLaunch(reportPath)];
-  if (editor === "zed") return [{ command: "zed", args: diffs.flatMap((file) => ["--diff", file.beforePath, file.afterPath]) }];
+  if (editor === "zed") {
+    const args = diffs.flatMap((file) => ["--diff", file.beforePath, file.afterPath]);
+    return platform === "darwin"
+      ? [{ command: "open", args: ["-a", "Zed", "--args", ...args] }]
+      : [{ command: "zed", args }];
+  }
   if (editor === "vscode" || editor === "codium") {
     const command = editor === "vscode" ? "code" : "codium";
     return diffs.map((file) => ({ command, args: ["--reuse-window", "--diff", file.beforePath, file.afterPath] }));
@@ -128,21 +134,28 @@ export function buildEditorLaunches(
   return [reportOpenLaunch(reportPath)];
 }
 
+export function editorProbeArgs(_command: string): string[] {
+  return ["--help"];
+}
+
 async function commandExists(pi: ExtensionAPI, command: string): Promise<boolean> {
   try {
-    const result = await pi.exec(command, ["--version"], { timeout: 2_000 });
+    const result = await pi.exec(command, editorProbeArgs(command), { timeout: 2_000 });
     return result.code === 0;
   } catch {
     return false;
   }
 }
 
-async function chooseEditor(pi: ExtensionAPI, config: EditorConfig): Promise<Exclude<EditorName, "auto">> {
+export async function chooseEditor(
+  config: Pick<EditorConfig, "editor">,
+  exists: (command: string) => Promise<boolean>,
+): Promise<Exclude<EditorName, "auto">> {
   const wanted = config.editor ?? "auto";
   if (wanted !== "auto") return wanted;
-  if (await commandExists(pi, "zed")) return "zed";
-  if (await commandExists(pi, "code")) return "vscode";
-  if (await commandExists(pi, "codium")) return "codium";
+  if (await exists("zed")) return "zed";
+  if (await exists("code")) return "vscode";
+  if (await exists("codium")) return "codium";
   return "report";
 }
 
@@ -345,7 +358,7 @@ export default function (pi: ExtensionAPI) {
       return;
     }
     const config = await loadConfig(ctx.cwd, ctx);
-    const editor = await chooseEditor(pi, config);
+    const editor = await chooseEditor(config, (command) => commandExists(pi, command));
     const launches = buildEditorLaunches(editor, manifest.files, manifest.reportPath, config);
     for (const launch of launches) {
       try {
