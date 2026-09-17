@@ -4,7 +4,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
-type CavemanLevel = "lite" | "full" | "ultra";
+type CavemanLevel = "lite" | "full" | "ultra" | "wenyan-lite" | "wenyan-full" | "wenyan-ultra";
 
 const FALLBACK_PROMPT = [
   "Respond in ultra-compressed caveman token-saver mode.",
@@ -41,7 +41,7 @@ export default function (pi: ExtensionAPI) {
   let enabled = true;
   let level: CavemanLevel = "ultra";
   const loaded = loadCavemanSkill();
-  const marker = `[pi-neko:caveman-source:v1:${loaded.hash}]`;
+  const marker = `[pi-neko:caveman-source:v2:${loaded.hash}]`;
 
   function contentHasMarker(content: unknown): boolean {
     if (typeof content === "string") return content.includes(marker);
@@ -107,19 +107,22 @@ export default function (pi: ExtensionAPI) {
   });
 
   pi.registerCommand("caveman-default", {
-    description: "Control default caveman mode: on|off|lite|full|ultra|status",
+    description: "Control default caveman mode: on|off|lite|full|ultra|wenyan-lite|wenyan-full|wenyan-ultra|status",
     handler: async (args, ctx) => {
       const sub = (args ?? "").trim().toLowerCase();
 
       if (sub === "on") enabled = true;
       else if (sub === "off") enabled = false;
-      else if (sub === "lite" || sub === "full" || sub === "ultra") {
+      else if (
+        sub === "lite" || sub === "full" || sub === "ultra" ||
+        sub === "wenyan-lite" || sub === "wenyan-full" || sub === "wenyan-ultra"
+      ) {
         level = sub;
         enabled = true;
       } else if (sub === "status" || sub === "") {
         // report below
       } else {
-        ctx.ui.notify("Usage: /caveman-default on|off|lite|full|ultra|status", "warning");
+        ctx.ui.notify("Usage: /caveman-default on|off|lite|full|ultra|wenyan-lite|wenyan-full|wenyan-ultra|status", "warning");
         return;
       }
 

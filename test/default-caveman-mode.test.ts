@@ -7,7 +7,7 @@ import { createMockExtensionHarness } from "./helpers/mock-extension-api.ts";
 function markerFrom(result: any): string {
   const content = result?.message?.content;
   assert.equal(typeof content, "string");
-  const marker = content.match(/\[pi-neko:caveman-source:v1:[a-f0-9]+\]/)?.[0];
+  const marker = content.match(/\[pi-neko:caveman-source:v2:[a-f0-9]+\]/)?.[0];
   assert.ok(marker);
   return marker;
 }
@@ -57,7 +57,7 @@ test("reinjects on a tree branch without the marker", async () => {
   assert.ok((result as any).message);
 });
 
-test("ignores stale marker from a different skill hash", async () => {
+test("ignores stale marker from a different skill version or hash", async () => {
   const harness = createMockExtensionHarness();
   defaultCavemanMode(harness.api);
   harness.state.contextEntries = [
@@ -68,4 +68,14 @@ test("ignores stale marker from a different skill hash", async () => {
 
   assert.ok((result as any).message);
   assert.doesNotMatch((result as any).message.content, /v1:deadbeef/);
+});
+
+test("supports Caveman v2 wenyan intensity modes", async () => {
+  const harness = createMockExtensionHarness();
+  defaultCavemanMode(harness.api);
+
+  await harness.commands.get("caveman-default").handler("wenyan-ultra", harness.ctx);
+  const [result] = await harness.emit("before_agent_start", { systemPrompt: "base" });
+
+  assert.match((result as any).systemPrompt, /Current caveman intensity: wenyan-ultra\./);
 });
