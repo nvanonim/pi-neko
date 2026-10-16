@@ -35,15 +35,27 @@ This repo bundles my pi extensions so they can be installed on other machines wi
   - Direct use is TUI-only. Child Pi processes (including `pi-fork` JSON workers) inherit a private local relay and show their questions in the parent TUI; standalone print, JSON, and RPC calls still reject rather than inventing an answer.
   - Concurrent child questions are queued so only one parent dialog owns terminal input at a time.
   - Use it after repository exploration for decisions that materially change work; do not use it for permission questions or facts the agent can discover.
-- `default-caveman-mode` — loads the installed `caveman` skill once, then applies a tiny reminder every turn, defaulting to ultra.
-  - Reads `~/.agents/skills/caveman/SKILL.md` first, then `~/.pi/agent/skills/caveman/SKILL.md`.
-  - Reinjects full skill source only when its hidden marker is missing from active post-compaction context (for example after compaction/branching or skill updates).
-  - Command: `/caveman-default on|off|lite|full|ultra|wenyan-lite|wenyan-full|wenyan-ultra|status`
 - `neko-stateql` — provides namespaced, stateful database access through [StateQL](https://github.com/FadhilP/stateql), created and maintained by [FadhilP](https://github.com/FadhilP).
   - `neko_stateql` handles read-only connections, bounded SQL/MongoDB/Redis reads, catalog inspection, and durable result handles.
   - `neko_stateql_write` handles confirmed plans, writes, profile changes, and transactions. Every Pi session starts in read mode.
   - Command: `/neko-stateql status|read|write`
   - Requires Node.js 22.19.0 or newer (Pi's minimum; StateQL itself requires 22.16).
+
+## Ponytail instead of Caveman
+
+The package manifest explicitly lists enabled extensions. `extensions/default-caveman-mode.ts` is disabled by default; its source and tests remain available for rollback. `/caveman-default` is unavailable while the extension is disabled. Installing or updating pi-neko does not enable it automatically.
+
+Use the official [Ponytail](https://github.com/DietrichGebert/ponytail) package by [Dietrich Gebert](https://github.com/DietrichGebert), which already provides a native Pi extension and six skills. No pi-neko wrapper or copied upstream code is needed. Install it separately on each machine:
+
+```bash
+pi install npm:@dietrichgebert/ponytail@5.2.0
+```
+
+Start a fresh Pi session after installing. Use `/ponytail status`, `/ponytail full`, or `/ponytail off`; `/ponytail default full` saves the default for future sessions. The pinned version will not advance automatically; review and deliberately change the pin when upgrading.
+
+For a Ponytail-only setup, also disable separately installed `caveman`, `caveman-commit`, `caveman-review`, `caveman-compress`, `caveman-help`, `caveman-stats`, and `cavecrew` skills through `pi config`. These personal resources are outside this repository and are not disabled by its manifest. Keep them installed for a reversible trial. `pi config` records resource exclusions in personal settings; those exclusions must be repeated on other machines.
+
+To roll back, remove Ponytail with `pi remove npm:@dietrichgebert/ponytail@5.2.0`, restore `./extensions/default-caveman-mode.ts` to `pi.extensions` in `package.json`, and re-enable the desired personal skills. Start a fresh session so previously loaded instructions do not linger.
 
 ## Neko StateQL
 
@@ -156,10 +168,10 @@ Restart Pi or run `/reload`. Use `/guard` to inspect Guard session counters. Age
 ├── package.json          # pi package manifest and development scripts
 ├── package-lock.json     # pinned development toolchain
 ├── tsconfig.json         # strict extension/test typechecking
-├── extensions/           # extension entrypoints loaded by pi
+├── extensions/           # only manifest-listed entrypoints load by default
 │   ├── agent-todo-widget.ts
 │   ├── ask-user.ts
-│   ├── default-caveman-mode.ts
+│   ├── default-caveman-mode.ts # disabled; retained for rollback
 │   ├── markdown-code-preview.ts
 │   ├── minimal-textchat-footer.ts
 │   ├── model-thinking-defaults.ts
@@ -185,7 +197,7 @@ npm run check
 
 Put future resources in conventional directories and add them to `package.json` if needed:
 
-- `extensions/` for `.ts` / `.js` pi extensions
+- `extensions/` for `.ts` / `.js` pi extensions; add enabled entrypoints explicitly to `pi.extensions`
 - `skills/` for skill folders containing `SKILL.md`
 - `prompts/` for prompt templates
 - `themes/` for theme `.json` files

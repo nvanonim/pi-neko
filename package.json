@@ -17,7 +17,13 @@
   },
   "pi": {
     "extensions": [
-      "./extensions"
+      "./extensions/agent-todo-widget.ts",
+      "./extensions/ask-user.ts",
+      "./extensions/markdown-code-preview.ts",
+      "./extensions/minimal-textchat-footer.ts",
+      "./extensions/model-thinking-defaults.ts",
+      "./extensions/neko-stateql.ts",
+      "./extensions/pi-change-review.ts"
     ],
     "skills": [
       "./skills"
