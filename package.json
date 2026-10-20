@@ -30,7 +30,7 @@
     ]
   },
   "dependencies": {
-    "@fadhilp/stateql": "0.13.2"
+    "@fadhilp/stateql": "0.18.0"
   },
   "peerDependencies": {
     "@earendil-works/pi-ai": "*",
