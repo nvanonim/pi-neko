@@ -16,7 +16,7 @@ This repo bundles my pi extensions so they can be installed on other machines wi
 - `pi-change-review` — saves prompt-scoped before/after snapshots for Pi `edit` and `write` calls, then opens native diffs in Zed, VS Code, Codium, or a custom editor.
   - Commands: `/review open|list|status|report|clear [latest|id|all]` (`/pi-review` remains an alias).
   - Storage: `~/.pi/agent/change-reviews/`, scoped to the current Pi session; no project files, commits, or stashes are created.
-  - Editor selection is automatic (`zed`, then `code`, then `codium`); each editor CLI must be in `PATH`. On macOS, expose Zed app CLI with `ln -s /Applications/Zed.app/Contents/MacOS/zed /opt/homebrew/bin/zed`.
+  - Editor selection prefers VS Code (`code`), then falls back to Zed (`zed`), Codium (`codium`), and finally the Markdown report when no editor is available. Each editor CLI must be in `PATH`. On macOS, install VS Code's `code` command through the Command Palette: `Shell Command: Install 'code' command in PATH`.
   - Or configure `~/.pi/agent/change-review.json` / trusted `.pi/change-review.json`:
     ```json
     { "editor": "custom", "command": "my-editor", "args": ["--diff", "{before}", "{after}"] }

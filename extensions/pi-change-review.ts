@@ -153,8 +153,8 @@ export async function chooseEditor(
 ): Promise<Exclude<EditorName, "auto">> {
   const wanted = config.editor ?? "auto";
   if (wanted !== "auto") return wanted;
-  if (await exists("zed")) return "zed";
   if (await exists("code")) return "vscode";
+  if (await exists("zed")) return "zed";
   if (await exists("codium")) return "codium";
   return "report";
 }

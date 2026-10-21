@@ -11,14 +11,24 @@ test("probes Zed with --help for macOS compatibility", () => {
   assert.deepEqual(editorProbeArgs("zed"), ["--help"]);
 });
 
-test("selects Zed before VS Code and Codium", async () => {
+test("selects VS Code first when every editor is available", async () => {
+  const calls: string[] = [];
+  const selected = await chooseEditor({}, async (command) => {
+    calls.push(command);
+    return true;
+  });
+  assert.equal(selected, "vscode");
+  assert.deepEqual(calls, ["code"]);
+});
+
+test("falls back to Zed when VS Code is unavailable", async () => {
   const calls: string[] = [];
   const selected = await chooseEditor({}, async (command) => {
     calls.push(command);
     return command === "zed";
   });
   assert.equal(selected, "zed");
-  assert.deepEqual(calls, ["zed"]);
+  assert.deepEqual(calls, ["code", "zed"]);
 });
 
 test("falls back through editor priority after unavailable probes", async () => {
@@ -28,7 +38,7 @@ test("falls back through editor priority after unavailable probes", async () => 
     return command === "codium";
   });
   assert.equal(selected, "codium");
-  assert.deepEqual(calls, ["zed", "code", "codium"]);
+  assert.deepEqual(calls, ["code", "zed", "codium"]);
 });
 
 test("uses report when every editor probe fails", async () => {
