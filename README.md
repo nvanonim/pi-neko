@@ -146,14 +146,14 @@ The included `neko-lantern` skill provides original, on-demand guidance for [Lan
 
 Use it for unfamiliar/large codebases, definition bodies, file outlines, callers, and change-impact investigation. It is not compulsory for every task and does not index projects at startup. If `lantern` is missing, the agent falls back to `rg` and `read`.
 
-Reviewed baseline: Lantern 0.3.0, commit `72e4c09e8b432ba2d75d773767994e92f44da6cd`. The npm package was unpublished and GitHub had no release binaries at setup time. Install from source with Rust 1.90+ and the platform build prerequisites (Windows: MSVC C++ Build Tools and Windows SDK). Install Rust/Cargo through [rustup](https://rustup.rs/) if needed, then run the pinned source installation:
+Reviewed baseline: Lantern 0.4.1, available as the official [`@fadhilp/lantern`](https://www.npmjs.com/package/@fadhilp/lantern) npm package. Install the pinned CLI separately with Node.js 18+ (Pi's Node.js requirement already satisfies this):
 
 ```bash
-cargo install --locked --git https://github.com/FadhilP/lantern --rev 72e4c09e8b432ba2d75d773767994e92f44da6cd lantern-cli
+npm install -g @fadhilp/lantern@0.4.1
 lantern --version
 ```
 
-Cargo installs the executable into `~/.cargo/bin` (`%USERPROFILE%\.cargo\bin` on Windows). Restart the terminal and Pi after installing Rust so Pi inherits the updated `PATH`. Once an official binary/npm release is available, review it before choosing a pinned version. Installing pi-neko alone does not install the CLI. Reload Pi after adding the skill.
+The package includes prebuilt binaries for Linux (x64/arm64, glibc/musl), macOS (x64/arm64), and Windows (x64/arm64); Rust and C++ build tools are not needed on these platforms. The install script points the global command at the native binary; with install scripts disabled, a small Node.js launcher runs it instead. Ensure npm's global executable directory is on `PATH`, then restart Pi so it inherits any `PATH` changes. Installing pi-neko alone does not install the CLI. Reload Pi after adding the skill. The version is pinned; review updates before changing it.
 
 Lantern stores indexed source content outside the repository. Review ignore rules and `.lanternignore` before indexing sensitive projects; results may enter Pi history/model context. Initial indexing can be costly. Normal queries refresh; use `--stale-ok` only between queries with no file changes. Name-based references/call graphs are discovery hints, not compiler-accurate analysis or a replacement for tests.
 

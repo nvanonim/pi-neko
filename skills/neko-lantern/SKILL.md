@@ -5,7 +5,7 @@ description: Optional Lantern CLI workflow for exploring large or unfamiliar cod
 
 # Neko Lantern
 
-Original pi-neko guidance for [Lantern](https://github.com/FadhilP/lantern), maintained by FadhilP. This skill does not bundle Lantern or copy its upstream skill. Command examples target 0.3.0, commit `72e4c09e8b432ba2d75d773767994e92f44da6cd`.
+Original pi-neko guidance for [Lantern](https://github.com/FadhilP/lantern), maintained by FadhilP. This skill does not bundle Lantern or copy its upstream skill. Command examples target 0.4.1, distributed as the official `@fadhilp/lantern@0.4.1` npm package with prebuilt binaries. When the user requests installation, use `npm install -g @fadhilp/lantern@0.4.1`; no Rust build is required on supported platforms.
 
 ## Availability and scope
 
