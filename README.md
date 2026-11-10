@@ -140,6 +140,23 @@ After installing optional packages, restart Pi or run `/reload`.
 - `pi-fork` — delegates noisy exploration, review, debugging, and planning to child Pi agents while keeping the main session cleaner. Good for MVP or big-feature work.
 - `pi-agent-browser-native` — adds the `agent_browser` tool for real browser sessions. Requires the separate `agent-browser` CLI on `PATH`.
 
+### Lantern code discovery (optional)
+
+The included `neko-lantern` skill provides original, on-demand guidance for [Lantern](https://github.com/FadhilP/lantern), maintained by [FadhilP](https://github.com/FadhilP). It does not bundle the executable or copy upstream code/skills. The existing `pi.skills` manifest makes the skill available in every session that loads pi-neko, across projects. Invoke `/skill:neko-lantern` explicitly when needed, or let the agent select it for code discovery.
+
+Use it for unfamiliar/large codebases, definition bodies, file outlines, callers, and change-impact investigation. It is not compulsory for every task and does not index projects at startup. If `lantern` is missing, the agent falls back to `rg` and `read`.
+
+Reviewed baseline: Lantern 0.3.0, commit `72e4c09e8b432ba2d75d773767994e92f44da6cd`. The npm package was unpublished and GitHub had no release binaries at setup time. Install from source with Rust 1.90+ and the platform build prerequisites (Windows: MSVC C++ Build Tools and Windows SDK). Install Rust/Cargo through [rustup](https://rustup.rs/) if needed, then run the pinned source installation:
+
+```bash
+cargo install --locked --git https://github.com/FadhilP/lantern --rev 72e4c09e8b432ba2d75d773767994e92f44da6cd lantern-cli
+lantern --version
+```
+
+Cargo installs the executable into `~/.cargo/bin` (`%USERPROFILE%\.cargo\bin` on Windows). Restart the terminal and Pi after installing Rust so Pi inherits the updated `PATH`. Once an official binary/npm release is available, review it before choosing a pinned version. Installing pi-neko alone does not install the CLI. Reload Pi after adding the skill.
+
+Lantern stores indexed source content outside the repository. Review ignore rules and `.lanternignore` before indexing sensitive projects; results may enter Pi history/model context. Initial indexing can be costly. Normal queries refresh; use `--stale-ok` only between queries with no file changes. Name-based references/call graphs are discovery hints, not compiler-accurate analysis or a replacement for tests.
+
 ### Pi Guard and Pi Verify (optional)
 
 [Pi Guard](https://github.com/FadhilP/pi-conductor/tree/v0.10.2/pi-guard), maintained by [FadhilP](https://github.com/FadhilP), adds confirmation gates for known destructive shell operations and protects sensitive workspace paths used by Pi's `write` and `edit` tools. [Pi Verify](https://github.com/FadhilP/pi-conductor/tree/v0.10.2/pi-verify) runs bounded, detected project checks after code changes.
@@ -179,6 +196,7 @@ Restart Pi or run `/reload`. Use `/guard` to inspect Guard session counters. Age
 │   └── pi-change-review.ts
 ├── lib/                  # shared extension runtime and state helpers
 ├── skills/
+│   ├── neko-lantern/     # optional on-demand code discovery guidance
 │   └── neko-stateql/     # StateQL workflow and safety guidance
 ├── test/                 # Node test suite and Pi API mocks
 └── README.md
