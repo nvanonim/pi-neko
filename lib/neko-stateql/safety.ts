@@ -9,6 +9,7 @@ export interface ConnectionSourceDetails {
   target?: string | null;
   secret_env?: string | null;
   read_only?: boolean;
+  env_file?: string;
 }
 
 export function assertCredentialInputSafe(input: StateQLToolInput): void {
@@ -46,6 +47,42 @@ function reviewJson(value: unknown): string {
   return short(JSON.stringify(redactSensitiveFields(value), null, 2));
 }
 
+function connectionSource(input: StateQLToolInput, profile?: ConnectionSourceDetails): string | null | undefined {
+  if (input.command === "connect" && profile) {
+    return profile.target ?? (profile.secret_env ? process.env[profile.secret_env] : undefined);
+  }
+  return input.target ?? (input.secret_env ? process.env[input.secret_env] : undefined)
+    ?? profile?.target ?? (profile?.secret_env ? process.env[profile.secret_env] : undefined);
+}
+
+export function connectionTLSWarning(input: StateQLToolInput, profile?: ConnectionSourceDetails): string | undefined {
+  const source = connectionSource(input, profile);
+  if (!source?.includes("://")) return undefined;
+  let url: URL;
+  try { url = new URL(source); } catch {
+    return "This remote connection string cannot be reviewed by Neko's URL parser. Encryption and server identity verification are unknown; explicitly review its transport settings before approving.";
+  }
+  const protocol = url.protocol;
+  for (const key of ["tlsInsecure", "tlsAllowInvalidCertificates", "tlsAllowInvalidHostnames"]) {
+    if (["true", "1"].includes((url.searchParams.get(key) ?? "").toLowerCase())) {
+      return `${key} disables part of TLS verification. Do not enable this for company connections without explicit approval.`;
+    }
+  }
+  if (["postgres:", "postgresql:", "mysql:"].includes(protocol)) {
+    const mode = (url.searchParams.get(protocol === "mysql:" ? "ssl-mode" : "sslmode") ?? "disabled").toLowerCase();
+    const verified = protocol === "mysql:" ? mode === "verify_identity" : mode === "verify-full";
+    if (!verified) return `TLS mode ${mode}: full certificate and hostname verification is not guaranteed. Use ${protocol === "mysql:" ? "ssl-mode=VERIFY_IDENTITY" : "sslmode=verify-full"} for company connections.`;
+  }
+  if (protocol === "redis:") return "redis:// does not encrypt this connection; use rediss:// for TLS.";
+  if (["mongodb:", "mongodb+srv:"].includes(protocol)) {
+    const tls = (url.searchParams.get("tls") ?? url.searchParams.get("ssl") ?? "").toLowerCase();
+    if (["false", "0"].includes(tls) || (protocol === "mongodb:" && !["true", "1"].includes(tls))) {
+      return "This MongoDB URL does not enable verified TLS by default. Review its transport settings before approving.";
+    }
+  }
+  return undefined;
+}
+
 function sanitizedSource(value: string): string {
   if (!value.includes("://")) return short(value, 500);
   try {
@@ -60,15 +97,14 @@ function sanitizedSource(value: string): string {
 }
 
 export function connectionReview(input: StateQLToolInput, profile?: ConnectionSourceDetails): string | undefined {
-  const source = input.target
-    ?? (input.secret_env ? process.env[input.secret_env] : undefined)
-    ?? profile?.target
-    ?? (profile?.secret_env ? process.env[profile.secret_env] : undefined);
+  const source = connectionSource(input, profile);
   const lines: string[] = [];
   if (input.profile) lines.push(`Profile: ${input.profile}`);
   if (input.secret_env ?? profile?.secret_env) lines.push(`Credential source: environment variable ${input.secret_env ?? profile?.secret_env}`);
   if (source) lines.push(`Endpoint: ${sanitizedSource(source)}`);
   if (profile?.read_only !== undefined) lines.push(`Stored profile policy: ${profile.read_only ? "read-only" : "read-write"}`);
+  const warning = connectionTLSWarning(input, profile);
+  if (warning) lines.push(`Transport warning: ${warning}`);
   return lines.length ? lines.join("\n") : undefined;
 }
 
@@ -78,15 +114,27 @@ export function operationSummary(input: StateQLToolInput): string {
   if (input.secret_env) lines.push(`Credential source: environment variable ${input.secret_env}`);
   if (input.target) lines.push(`Target: ${sanitizedSource(input.target)}`);
   if (input.name) lines.push(`Name: ${input.name}`);
-  if (input.handle) lines.push(`Handle: ${input.handle}`);
-  if (input.sql) lines.push(`SQL:\n${short(input.sql)}`);
-  if (input.params) lines.push(`Parameters:\n${reviewJson(input.params)}`);
-  if (input.mongo) lines.push(`MongoDB command:\n${reviewJson(input.mongo)}`);
+  if ("handle" in input && input.handle) lines.push(`Handle: ${input.handle}`);
+  if (input.sql) lines.push(`SQL:\n${input.sql}`);
+  if (input.params) lines.push(`Parameters:\n${JSON.stringify(redactSensitiveFields(input.params), null, 2)}`);
+  if (input.mongo) lines.push(`MongoDB command:\n${JSON.stringify(redactSensitiveFields(input.mongo), null, 2)}`);
   if (input.redis) {
     const redis = input.redis.command.toUpperCase() === "AUTH"
       ? { command: input.redis.command, args: ["[REDACTED]"] }
       : input.redis;
     lines.push(`Redis command:\n${reviewJson(redis)}`);
+  }
+  if ("expect_rows" in input && input.expect_rows !== undefined) lines.push(`Expected affected rows (expect_rows): ${input.expect_rows}`);
+  if ("statements" in input && input.statements) {
+    lines.push(`Atomic SQL batch: ${input.statements.length} statements`);
+    for (const [index, statement] of input.statements.entries()) {
+      lines.push(`Statement ${index + 1}:\n${statement.sql}`);
+      if (statement.params) lines.push(`Parameters:\n${JSON.stringify(redactSensitiveFields(statement.params), null, 2)}`);
+      if (statement.expect_rows !== undefined) lines.push(`Expected affected rows (expect_rows): ${statement.expect_rows}`);
+      if (statement.idempotency_key) lines.push(`Idempotency key: ${statement.idempotency_key}`);
+      if (statement.allow_destructive) lines.push("Destructive override requested");
+      if (statement.allow_unbounded) lines.push("Unbounded override requested");
+    }
   }
   const requestedReadOnly = "read_only" in input ? input.read_only : undefined;
   if (requestedReadOnly !== undefined) lines.push(`Requested profile policy: ${requestedReadOnly ? "read-only" : "read-write"}`);
@@ -129,10 +177,10 @@ export async function confirmWrite(
   await requireConfirmation(
     ctx,
     "Approve Neko StateQL write operation",
-    `${operationSummary(input)}${reviewContext ? `\n\nReview context:\n${reviewContext}` : ""}\n\nThis operation may modify database or durable StateQL configuration.`,
+    `${operationSummary(input)}${reviewContext ? `\n\nReview context:\n${reviewContext}` : ""}\n\nThis operation may modify database or durable StateQL configuration.${input.command.startsWith("profile.") ? "\nProfile creation, replacement, or removal can read or delete an OS keyring credential with this name. StateQL keyring accounts are shared across state homes; this may affect other StateQL installations." : ""}`,
     signal,
   );
-  if (input.allow_unbounded) {
+  if (input.allow_unbounded || input.statements?.some((statement) => statement.allow_unbounded)) {
     await requireConfirmation(
       ctx,
       "Approve unbounded database mutation",
@@ -140,7 +188,7 @@ export async function confirmWrite(
       signal,
     );
   }
-  if (input.allow_destructive) {
+  if (input.allow_destructive || input.statements?.some((statement) => statement.allow_destructive)) {
     await requireConfirmation(
       ctx,
       "Approve destructive database operation",

@@ -15,7 +15,7 @@ import {
   confirmReadConnection,
   confirmWrite,
   connectionReview,
-  operationSummary,
+  connectionTLSWarning,
   requireConfirmation,
   type ConnectionSourceDetails,
 } from "../lib/neko-stateql/safety.ts";
@@ -26,7 +26,7 @@ const WRITE_COMMAND = "neko-stateql";
 
 const READ_DESCRIPTION = `Read databases through StateQL by FadhilP, using isolated durable state managed by pi-neko. Supports read-only connections, parameterized SQL, bounded MongoDB/Redis reads, catalog inspection, and reusable result handles. Connections are forced read-only. Use secret_env for credential-bearing remote URLs. SQL, parameters, and returned rows may enter Pi history and model-provider context. Output is capped at 40 KB.`;
 
-const WRITE_DESCRIPTION = `Perform explicitly approved database writes through StateQL by FadhilP. This tool is inactive and blocked until the user runs /neko-stateql write in the current Pi session. Write mode never bypasses per-operation confirmation or StateQL safeguards. Prefer plan before apply, use idempotency keys for retryable writes, and never retry OUTCOME_UNKNOWN automatically.`;
+const WRITE_DESCRIPTION = `Perform explicitly approved database writes through StateQL by FadhilP. This tool is inactive and blocked until the user runs /neko-stateql write in the current Pi session. Write mode never bypasses per-operation confirmation or StateQL safeguards. Use expect_rows and idempotency keys for writes, atomic for reviewed SQL batches, and never retry OUTCOME_UNKNOWN automatically.`;
 
 function sessionId(ctx: ExtensionContext): string {
   const id = ctx.sessionManager.getSessionId();
@@ -47,7 +47,6 @@ export default function nekoStateQL(
 ) {
   let runtime: StateQLRuntime | undefined;
   let writesUnlocked = false;
-  const planSummaries = new Map<string, string>();
 
   const getRuntime = async (ctx: ExtensionContext): Promise<StateQLRuntime> => {
     const id = sessionId(ctx);
@@ -66,18 +65,12 @@ export default function nekoStateQL(
   ) => {
     try {
       const response = await (await getRuntime(ctx)).execute(command, signal);
-      if (!response.ok && response.error.code === "OUTCOME_UNKNOWN") {
+      if (!response.ok && response.error?.code === "OUTCOME_UNKNOWN") {
         writesUnlocked = false;
-        if (input.handle) planSummaries.delete(input.handle);
         pi.setActiveTools(activeWithoutWrite(pi));
         ctx.ui.setStatus("neko-stateql-outcome", "StateQL write outcome unknown — inspect database state");
         ctx.ui.notify("StateQL write outcome is unknown. Read mode restored; inspect authoritative database state before enabling write mode again.", "error");
       }
-      if (response.ok && ["plan", "mongo.plan", "redis.plan"].includes(input.command)) {
-        const planId = (response.data as { plan_id?: unknown }).plan_id;
-        if (typeof planId === "string") planSummaries.set(planId, operationSummary(input));
-      }
-      if (response.ok && input.command === "apply" && input.handle) planSummaries.delete(input.handle);
       return responseResult(response, input);
     } catch (error) {
       throw safeError(error, input);
@@ -90,49 +83,28 @@ export default function nekoStateQL(
     signal?: AbortSignal,
   ): Promise<string | undefined> => {
     let profile: ConnectionSourceDetails | undefined;
+    // Native connect also treats a matching target string as a saved profile name.
     const profileName = input.profile
-      ?? (["profile.update", "profile.remove"].includes(input.command) ? input.name : undefined);
+      ?? (input.command === "connect" ? input.target : undefined)
+      ?? (["profile.replace", "profile.remove"].includes(input.command) ? input.name : undefined);
     if (profileName) {
       const shown = await (await getRuntime(ctx)).execute(
         { command: "profile.show", name: profileName },
         signal,
-        "system",
-        true,
       );
-      if (!shown.ok) throw new Error(`Cannot review StateQL profile ${profileName}: ${shown.error.message}`);
-      profile = shown.data as ConnectionSourceDetails;
+      if (!shown.ok && !(input.command === "connect" && !input.profile && shown.error?.code === "PROFILE_NOT_FOUND")) {
+        throw new Error(`Cannot review StateQL profile ${profileName}: ${shown.error?.message ?? "lookup failed"}`);
+      }
+      if (shown.ok) profile = shown as ConnectionSourceDetails;
+      if (profile?.env_file && (!profile.secret_env || process.env[profile.secret_env] === undefined)) {
+        throw new Error("Neko StateQL cannot review env-file credentials. Set the profile's environment variable before starting Pi; no connection was attempted.");
+      }
+    }
+    if (input.command === "connect") {
+      const warning = connectionTLSWarning(input, profile);
+      if (warning) await requireConfirmation(ctx, "Approve reduced database transport security", warning, signal);
     }
     return connectionReview(input, profile);
-  };
-
-  const transactionContext = async (
-    input: WriteToolInput,
-    ctx: ExtensionContext,
-    signal?: AbortSignal,
-  ): Promise<string> => {
-    const status = await (await getRuntime(ctx)).execute(
-      { command: "transaction.status", ...(input.handle ? { handle: input.handle } : {}) },
-      signal,
-      "system",
-      true,
-    );
-    if (!status.ok) throw new Error(`Cannot review StateQL transaction: ${status.error.message}`);
-    const data = status.data as {
-      transaction_id: string;
-      state: string;
-      statements: number;
-      pending_writes: number;
-      owner_actor_id: string;
-      isolation_level: string;
-    };
-    return [
-      `Transaction: ${data.transaction_id}`,
-      `State: ${data.state}`,
-      `Statements: ${data.statements}`,
-      `Pending writes: ${data.pending_writes}`,
-      `Isolation: ${data.isolation_level}`,
-      `Owner: ${data.owner_actor_id}`,
-    ].join("\n");
   };
 
   const readTool = defineTool({
@@ -153,6 +125,7 @@ export default function nekoStateQL(
       const command = toReadBatch(input);
       assertCredentialInputSafe(input);
       if (input.command === "connect" || input.command === "disconnect") {
+        if (!ctx.hasUI) throw new Error("Neko StateQL connection changes require interactive confirmation");
         const context = input.command === "connect" ? await connectionContext(input, ctx, signal) : undefined;
         await confirmReadConnection(input, ctx, signal, context);
       }
@@ -168,9 +141,9 @@ export default function nekoStateQL(
     name: WRITE_TOOL,
     label: "Neko StateQL Write",
     description: WRITE_DESCRIPTION,
-    promptSnippet: "Run user-enabled, individually confirmed StateQL plans, writes, profile changes, and transactions.",
+    promptSnippet: "Run user-enabled, individually confirmed StateQL writes, atomic SQL batches, and profile changes.",
     promptGuidelines: [
-      "Use neko_stateql_write only for database changes explicitly requested by the user; prefer plan before apply and include idempotency_key when retries are plausible.",
+      "Use neko_stateql_write only for database changes explicitly requested by the user; specify expect_rows and include idempotency_key when retries are plausible.",
       "Never retry a StateQL OUTCOME_UNKNOWN write. Inspect database state and ask the user for direction before enabling write mode again.",
     ],
     parameters: WriteToolSchema,
@@ -179,18 +152,12 @@ export default function nekoStateQL(
     async execute(_toolCallId, input: WriteToolInput, signal, onUpdate, ctx) {
       if (!writesUnlocked) throw new Error(`Neko StateQL is in read mode. User must run /${WRITE_COMMAND} write.`);
       const command = toWriteBatch(input);
+      if (!ctx.hasUI) throw new Error("Neko StateQL writes require interactive confirmation");
       assertCredentialInputSafe(input);
       let reviewContext: string | undefined;
-      if (input.command === "apply") {
-        reviewContext = input.handle ? planSummaries.get(input.handle) : undefined;
-        if (!reviewContext) {
-          throw new Error("Neko StateQL can only apply a plan created and reviewed in the current Pi session. Create the plan again.");
-        }
-      } else if (["connect", "profile.add", "profile.update", "profile.remove"].includes(input.command)) {
+      if (["connect", "profile.add", "profile.replace", "profile.remove"].includes(input.command)) {
         reviewContext = await connectionContext(input, ctx, signal);
         if (input.command === "connect") reviewContext = `Requested access: read-write${reviewContext ? `\n${reviewContext}` : ""}`;
-      } else if (["transaction.commit", "transaction.rollback"].includes(input.command)) {
-        reviewContext = await transactionContext(input, ctx, signal);
       }
       await confirmWrite(input, ctx, signal, reviewContext);
       if (!writesUnlocked) throw new Error("Neko StateQL writes were locked before execution; nothing was executed.");
@@ -250,7 +217,6 @@ export default function nekoStateQL(
     await runtime?.close();
     runtime = undefined;
     writesUnlocked = false;
-    planSummaries.clear();
     pi.setActiveTools(activeWithoutWrite(pi));
     ctx.ui.setStatus("neko-stateql-writes", undefined);
     ctx.ui.setStatus("neko-stateql-outcome", undefined);
@@ -258,7 +224,6 @@ export default function nekoStateQL(
 
   pi.on("session_shutdown", async (_event, ctx) => {
     writesUnlocked = false;
-    planSummaries.clear();
     pi.setActiveTools(activeWithoutWrite(pi));
     ctx.ui.setStatus("neko-stateql-writes", undefined);
     ctx.ui.setStatus("neko-stateql-outcome", undefined);

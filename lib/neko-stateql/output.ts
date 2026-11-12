@@ -1,4 +1,4 @@
-import type { Response } from "@fadhilp/stateql";
+import type { CLIResponse } from "./commands.ts";
 import type { StateQLToolInput } from "./commands.ts";
 
 export const MAX_TOOL_OUTPUT_BYTES = 40 * 1024;
@@ -28,7 +28,7 @@ export function boundedJson(value: unknown, maxBytes = MAX_TOOL_OUTPUT_BYTES): {
   return boundedText(JSON.stringify(value, null, 2), maxBytes);
 }
 
-export function responseResult(response: Response<unknown>, input: StateQLToolInput) {
+export function responseResult(response: CLIResponse, input: StateQLToolInput) {
   const bounded = boundedText(redactCredential(JSON.stringify(response, null, 2), input));
   const text = bounded.text;
   return {
@@ -37,9 +37,8 @@ export function responseResult(response: Response<unknown>, input: StateQLToolIn
       command: input.command,
       ok: response.ok,
       truncated: bounded.truncated,
-      commandId: response.command_id,
-      sessionId: response.session_id,
-      errorCode: response.ok ? undefined : response.error.code,
+      handle: typeof response.handle === "string" ? response.handle : undefined,
+      errorCode: response.ok ? undefined : response.error?.code,
     },
   };
 }
