@@ -8,16 +8,16 @@
 
 **Yes, as an optional navigation aid—not as an authority on correctness.** It is most useful when repeatedly exploring large/unfamiliar repositories, locating definitions and callers, or reviewing which definitions changed. For this small TypeScript extension repository, `rg` and `read` are usually sufficient. Larger Java/Spring services can benefit more from its indexed navigation.
 
-Lantern 1.1.0 supports 13 grammars, including Java, JavaScript, TypeScript/TSX, and Python; text search also covers SQL, configuration, and documentation. Its reference and call-graph resolution is name-based. Overloads, same-named methods, Spring dependency injection, proxies, reflection, and generated implementations still require source inspection, compiler checks, and tests. Java import/general type references are not comprehensive.
+Lantern 1.2.0 supports 13 grammars, including Java, JavaScript, TypeScript/TSX, and Python; text search also covers SQL, configuration, and documentation. Its reference and call-graph resolution is name-based. Overloads, same-named methods, Spring dependency injection, proxies, reflection, and generated implementations still require source inspection, compiler checks, and tests. Java type references cover constructor calls (`new X`), not every type use; Java import references still require text search.
 
 The project publishes performance measurements on the VS Code repository, but those are upstream measurements, not a guarantee for this repository or your company code. Initial indexing and disk space are real costs; measure on an approved project before making Lantern part of a routine.
 
 ## Install CLI and official skill
 
-Reviewed baseline: [Lantern 1.1.0](https://github.com/FadhilP/lantern/releases/tag/v1.1.0). Install only when wanted. The official npm package includes the skill; copy it into Pi's global skills directory once per machine:
+Reviewed baseline: [Lantern 1.2.0](https://github.com/FadhilP/lantern/releases/tag/v1.2.0). Install only when wanted. The official npm package includes the skill; copy it into Pi's global skills directory once per machine:
 
 ```bash
-npm install -g @fadhilp/lantern@1.1.0
+npm install -g @fadhilp/lantern@1.2.0
 lantern --version
 mkdir -p "$HOME/.pi/agent/skills/lantern"
 cp "$(npm root -g)/@fadhilp/lantern/skills/lantern/SKILL.md" \
@@ -29,7 +29,7 @@ If you only want the skill before installing the CLI, download the same pinned u
 ```bash
 mkdir -p "$HOME/.pi/agent/skills/lantern"
 curl --fail --location \
-  https://raw.githubusercontent.com/FadhilP/lantern/v1.1.0/skills/lantern/SKILL.md \
+  https://raw.githubusercontent.com/FadhilP/lantern/v1.2.0/skills/lantern/SKILL.md \
   --output "$HOME/.pi/agent/skills/lantern/SKILL.md"
 ```
 
@@ -37,7 +37,16 @@ These commands replace an existing global `lantern` skill, so review any local e
 
 Node.js 18+ is enough for the launcher; Pi's requirement already satisfies it. The official npm package includes prebuilt Linux x64/arm64 glibc/musl, macOS x64/arm64, and Windows x64/arm64 binaries. No Rust/C++ build tools are required on those platforms. Its install script links the native command; with scripts disabled, a Node.js launcher runs it instead. The multi-platform npm artifact is sizeable (about 220 MB unpacked for this release).
 
-Ensure npm's executable directory is on `PATH`, then restart Pi if its environment changed. Installing pi-neko alone does not install Lantern or its global skill. Without the executable, continue using `rg` and `read` rather than installing software automatically. Review release changes before changing the pin. Existing 0.4.1 users should verify command/output differences rather than assume compatibility: 1.1.0 defaults to compact text; scripts should request `--json`.
+On Windows with nvm, the native-link install script can produce a broken launcher through the Node installation symlink. If `lantern --version` fails after installation, reinstall using the standard Node.js launcher instead:
+
+```bash
+npm install -g @fadhilp/lantern@1.2.0 --ignore-scripts
+lantern --version
+```
+
+If migrating from our earlier Cargo installation, first verify the npm launcher explicitly (`"$(npm prefix -g)/lantern" --version` in Git Bash), then run `cargo uninstall lantern-cli` to remove the old executable if it shadows npm on `PATH`. This removes Lantern only, not Rust/Cargo. Restart the shell or clear its command cache (`hash -r` in Bash).
+
+Ensure npm's executable directory is on `PATH`, then restart Pi if its environment changed. Installing pi-neko alone does not install Lantern or its global skill. Without the executable, continue using `rg` and `read` rather than installing software automatically. Review release changes before changing the pin. Existing 0.4.1 users should verify command/output differences rather than assume compatibility: 1.2.0 defaults to compact text; scripts should request `--json`.
 
 ## Company-code checklist
 
@@ -71,20 +80,25 @@ Run in the intended project or pass `-C /path/to/project`:
 ```bash
 lantern symbols BillingService --kind class --max-bytes 8K
 lantern symbols BillingService.createInvoice --body --limit 3 --max-bytes 8K
+lantern symbols BillingService InvoiceService --max-bytes 8K
+lantern symbols --path src/main/java --kind class,interface --max-bytes 8K
 lantern refs createInvoice --kind call --limit 20 --max-bytes 8K
 lantern graph createInvoice --direction callers --depth 1 --max-bytes 8K
 lantern outline src/main/java/example/BillingService.java --max-bytes 8K
 lantern code 'Transactional' --path '*.java' --context 3 --max-bytes 8K
+lantern code 'Transactional' -l --path '*.java' --max-bytes 8K
 lantern changes main...HEAD --path src --max-bytes 8K
 lantern changes main...HEAD --diff BillingService.createInvoice --path src --max-bytes 8K
 ```
+
+In 1.2.0, exact symbol matches hide looser matches unless `--fuzzy` is added. `symbols` accepts multiple names or no name with `--path`; `outline` accepts multiple files, not directories. `code` reports enclosing definitions and supports `-l` for file names with match counts. Text search defaults to five matches per file. Use returned cursors, `--limit`, and `--max-bytes` instead of piping results through `head`.
 
 The first indexed query in a Git repository can build an expensive index. `changes` needs no index. For successive indexed queries with no intervening edits, add `--stale-ok` after the first refresh; omit it after edits or branch switches. Follow cursors rather than cutting output. Definition bodies stop at 100 lines, and long lines may be shortened, so read original source before treating a truncated implementation as fully reviewed.
 
 ## Sources and validation
 
-- [Official CLI reference](https://github.com/FadhilP/lantern/blob/v1.1.0/docs/cli.md)
-- [Architecture and indexing behavior](https://github.com/FadhilP/lantern/blob/v1.1.0/docs/architecture.md)
-- [Official agent skill](https://github.com/FadhilP/lantern/blob/v1.1.0/skills/lantern/SKILL.md)
+- [Official CLI reference](https://github.com/FadhilP/lantern/blob/v1.2.0/docs/cli.md)
+- [Architecture and indexing behavior](https://github.com/FadhilP/lantern/blob/v1.2.0/docs/architecture.md)
+- [Official agent skill](https://github.com/FadhilP/lantern/blob/v1.2.0/skills/lantern/SKILL.md)
 
-The guidance was checked against 1.1.0 documentation/source and npm metadata. It is not a benchmark or compliance approval for a company repository. No company repository was indexed to prepare this guide.
+The guidance was checked against 1.2.0 official skill documentation and npm metadata. The npm CLI and matching global skill were installed locally; bounded smoke queries were run against pi-neko. It is not a benchmark or compliance approval for a company repository. No company repository was indexed to prepare this guide.
