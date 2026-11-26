@@ -49,7 +49,7 @@ Use Lantern's **official global skill**, not a pi-neko copy. Install the CLI and
 - [Extensions and commands](docs/extensions.md): footer, reviews, clipboard setup, todos, questions, and disabled Caveman behavior.
 - [StateQL](docs/stateql.md): profiles, Keychain/environment credentials, write approvals, data exposure, and v1 migration.
 - [Lantern](docs/lantern.md): installation, work-project suitability, confidentiality, and discovery limitations.
-- [Optional packages](docs/optional-packages.md): pinned Ponytail setup and rollback, web/browser tools, delegation, Guard, and Verify.
+- [Optional packages](docs/optional-packages.md): Ponytail, web/browser tools, [Diagram Design](docs/optional-packages.md#diagram-design-for-plans-and-flows), delegation, Guard, and Verify.
 
 **Company work:** database results and code returned by tools may enter Pi history and model-provider context. Review your organization's policy and each guide's storage and security notes before use.
 
@@ -63,6 +63,7 @@ pi-neko builds on [Pi](https://pi.dev) and uses or recommends these independent 
 - [pi-fork](https://github.com/elpapi42/pi-fork) — [elpapi42](https://github.com/elpapi42).
 - [pi-agent-browser-native](https://github.com/fitchmultz/pi-agent-browser-native) — [Mitch Fultz](https://github.com/fitchmultz).
 - [agent-browser](https://github.com/vercel-labs/agent-browser) — [Vercel Labs](https://github.com/vercel-labs).
+- [Diagram Design](https://github.com/cathrynlavery/diagram-design) — [Cathryn Lavery](https://github.com/cathrynlavery).
 - [Caveman](https://github.com/JuliusBrussee/caveman) — [JuliusBrussee](https://github.com/JuliusBrussee); our optional integration is currently disabled.
 
 StateQL is a bundled runtime dependency. The other projects above are optional external tools/packages or retained integration references, not bundled dependencies. See the [optional-package guide](docs/optional-packages.md) for setup.

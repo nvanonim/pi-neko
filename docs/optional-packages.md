@@ -45,6 +45,18 @@ After installing, restart Pi or run `/reload`.
 - `pi-fork` delegates noisy exploration, review, debugging, and planning to child agents while keeping the main session cleaner. It is useful for MVP or larger-feature work.
 - `pi-agent-browser-native` adds the `agent_browser` tool for real browser sessions. The separate `agent-browser` CLI must be in `PATH`.
 
+## Diagram Design for plans and flows
+
+Add the official [Diagram Design](https://github.com/cathrynlavery/diagram-design) package alongside your web and browser tools. It turns plans, flows, and architecture into standalone HTML files with inline SVG that you can open in a browser. Install it separately on each machine:
+
+```bash
+pi install git:github.com/cathrynlavery/diagram-design@b228c5d77794a84150fca41b22940bb316b1398d
+```
+
+Restart Pi or run `/reload`. Pi can select the skill automatically when you ask for a diagram. To invoke it explicitly, try `/skill:diagram-design Visualize this plan as a dependency graph. Keep the default style and use system fonts.` Use system fonts for offline viewing or to avoid the default Google Fonts requests.
+
+Validation scripts need Python 3 (`python` on Windows if `python3` is unavailable). Rendered previews and PNG export also need Playwright and its browser; opening the HTML doesn't. Run `/doctor` to check the diagram tooling.
+
 ## Lantern code discovery
 
 Use the official `lantern` skill globally with its separately installed CLI; pi-neko does not bundle either or maintain a duplicate skill. See the [Lantern guide](lantern.md#install-cli-and-official-skill) for installation and `/skill:lantern` usage, plus work-project suitability and indexing limitations.
